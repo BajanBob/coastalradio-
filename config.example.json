@@ -1,0 +1,202 @@
+{
+  "station": {
+    "name": "OCEAN CITY RADIO",
+    "callsign": "8PFX",
+    "lat": 13.0975,
+    "lon": -59.6167,
+    "announcement_extra": "",
+    "announcement_template": ""
+  },
+
+  "data_dir": "data",
+
+  "receivers": [
+    {
+      "name": "IC-9100",
+      "enabled": true,
+      "rig": "icom",
+      "port": "COM5",
+      "baud": 19200,
+      "civ_address": "0x7C",
+      "audio_device": "USB Audio CODEC",
+      "audio_channel": 0,
+      "sample_rate": 48000,
+      "channel": "A"
+    },
+    {
+      "name": "FT-991A",
+      "enabled": true,
+      "rig": "yaesu",
+      "port": "COM7",
+      "baud": 38400,
+      "audio_device": "USB Audio CODEC",
+      "audio_channel": 0,
+      "sample_rate": 48000,
+      "channel": "B"
+    },
+    {
+      "name": "FTM-510DR",
+      "enabled": false,
+      "rig": "manual",
+      "audio_device": "Line In",
+      "sample_rate": 48000,
+      "channel": "A"
+    }
+  ],
+
+  "dsc_receivers": [
+    {
+      "name": "DSC Ch70",
+      "enabled": false,
+      "rig": "manual",
+      "audio_device": "USB Audio Device",
+      "audio_channel": 0,
+      "sample_rate": 48000
+    }
+  ],
+
+  "hf_receivers": [
+    {
+      "name": "HF receiver",
+      "enabled": false,
+      "rig": "yaesu",
+      "model": "ft991a",
+      "port": "COM7",
+      "baud": 38400,
+      "audio_device": "USB Audio CODEC",
+      "audio_channel": 0,
+      "sample_rate": 48000,
+      "output_device": null,
+      "start_khz": 8291,
+      "start_mode": "USB",
+      "noise_reduction": true,
+      "auto_notch": true,
+      "agc": true,
+      "voice_snr_db": 4,
+      "hang_seconds": 4,
+      "scan_dwell_seconds": 2.5,
+      "record": true,
+      "selcal_watch": { "AB-CD": "example: 8P-ABC" },
+      "extra_channels": [ { "group": "My channels", "label": "Caribbean net", "khz": 7188, "mode": "LSB" } ],
+      "scan_lists": { "My list": [8291, 5550, 8846] }
+    },
+    {
+      "name": "IC-9700 2 m / 70 cm",
+      "enabled": false,
+      "rig": "ic9700",
+      "port": "COM9",
+      "baud": 115200,
+      "audio_device": "USB Audio CODEC",
+      "sample_rate": 48000,
+      "start_khz": 145500,
+      "start_mode": "FM"
+    }
+  ],
+
+  "radiosondes": [
+    {
+      "name": "RTL-SDR 400-406 MHz",
+      "enabled": false,
+      "audio_device": "CABLE Output",
+      "audio_channel": 0,
+      "sample_rate": 48000,
+      "frequency_mhz": 403.0
+    }
+  ],
+
+  "feeds": {
+    "hfdl": { "enabled": false, "port": 5555, "bind": "0.0.0.0" },
+    "acars": { "enabled": false, "port": 5556, "bind": "0.0.0.0" },
+    "inmarsat": { "enabled": false, "port": 5557, "bind": "0.0.0.0" },
+    "ai_triage": true
+  },
+
+  "traffic_watch": {
+    "zones": [],
+    "cpa_nm": 0.5,
+    "tcpa_min": 15,
+    "cpa_range_nm": 25,
+    "dark_range_nm": 15,
+    "dark_minutes_a": 10,
+    "dark_minutes_b": 15,
+    "anchor_radius_m": 150
+  },
+
+  "share": [
+    { "name": "AISHub", "host": "", "port": 0 }
+  ],
+
+  "ai": {
+    "api_key": "",
+    "model": "claude-sonnet-5-5",
+    "api_version": "2023-06-01",
+    "workspace_id": ""
+  },
+
+  "recorders": [
+    {
+      "name": "VHF Ch16",
+      "enabled": true,
+      "audio_device": "Line In",
+      "audio_channel": 0,
+      "threshold_db": -38,
+      "hang_seconds": 2.5,
+      "preroll_seconds": 1.5,
+      "retention_days": 90
+    },
+    {
+      "name": "IC-M710 2182 kHz",
+      "enabled": false,
+      "audio_device": "USB Audio Device",
+      "audio_channel": 0,
+      "threshold_db": -35
+    },
+    {
+      "name": "Barrett 2050 HF",
+      "enabled": false,
+      "audio_device": "USB Audio Device",
+      "audio_channel": 1,
+      "threshold_db": -35
+    }
+  ],
+
+  "announcements": {
+    "output_device": null,
+    "reminders": []
+  },
+
+  "notify": {
+    "min_level": "crit",
+    "email": {
+      "smtp_host": "",
+      "smtp_port": 587,
+      "username": "",
+      "password": "",
+      "from": "",
+      "to": []
+    },
+    "telegram": {
+      "bot_token": "",
+      "chat_ids": []
+    },
+    "whatsapp": {
+      "phone_number_id": "",
+      "access_token": "",
+      "to": [],
+      "template": "",
+      "language": "en"
+    },
+    "webhook": {
+      "url": ""
+    }
+  },
+
+  "nmea_in_udp": [],
+  "nmea_in_serial": [],
+  "nmea_udp": ["127.0.0.1:10110"],
+  "nmea_tcp_port": 10110,
+
+  "web_port": 8100,
+  "web_lan": false,
+  "vessel_timeout_min": 60
+}

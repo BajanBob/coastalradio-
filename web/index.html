@@ -1,0 +1,999 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ocean City Watch</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<style>
+/* ---------- faceplates ---------- */
+:root{--mono:ui-monospace,Consolas,monospace;--gold:#d9a93a;
+  /* Ocean City: deep blue, cyan/green readouts, red alarms, gold trim */
+  --bg:#06101a;--panel:#0c1824;--panel2:#10202f;--line:#1c3246;--ink:#d8e6f2;--dim:#7f97ad;--dim2:#9fb6cb;
+  --a:#33d6ff;--b:#ffb020;--ok:#2ee6a6;--bad:#ff3b4e;--warn:#ffb020;
+  --hdr:#081420;--nav:#071119;--field:#0a1622;--row:#12263a;--sel:#173350;--meterbg:#13283a;--mapbg:#0a1825;--emrow:#3a0d14;
+  --lcd:#7dffcf;--lcdbg:#03100c;--lcdline:#13402f;--lcdglow:#2ee6a688;--bezel:#1c3246;--maptiles:none}
+:root[data-face="gold"]{ /* Admiralty Gold: navy and brass, green LCDs, red alarms */
+  --bg:#070b16;--panel:#0d1424;--panel2:#141d33;--line:#5a4a22;--ink:#f1e6c8;--dim:#b8a77a;--dim2:#d6c79a;
+  --a:#f2c14e;--b:#e8a33a;--ok:#4fe39a;--bad:#ff4040;--warn:#f2a93b;
+  --hdr:#0b1020;--nav:#0a0f1d;--field:#0b1222;--row:#1c2236;--sel:#2c2a1c;--meterbg:#1e2236;--mapbg:#0b1222;--emrow:#3d1010;
+  --lcd:#8dffb4;--lcdbg:#04120a;--lcdline:#8a6d28;--lcdglow:#4fe39a77;--bezel:#b48b2e;--gold:#f2c14e}
+:root[data-face="rescue"]{ /* Rescue Red: charcoal, red and gold, blue LCDs */
+  --bg:#0d0b0c;--panel:#171314;--panel2:#1f191a;--line:#4a2226;--ink:#f3e9e4;--dim:#b49a92;--dim2:#d2bcb4;
+  --a:#ff5a4f;--b:#f2b544;--ok:#3fd6ff;--bad:#ff2e3e;--warn:#f2b544;
+  --hdr:#140f10;--nav:#120d0e;--field:#130f10;--row:#2a1c1e;--sel:#3a2326;--meterbg:#2a1c1e;--mapbg:#120d0e;--emrow:#4a0d14;
+  --lcd:#7fd8ff;--lcdbg:#050c12;--lcdline:#6a2a2a;--lcdglow:#3fb6ff77;--bezel:#c9962f;--gold:#f2b544}
+:root[data-face="night"]{ /* Night: red on black only, dim, keeps night vision */
+  --bg:#000;--panel:#070000;--panel2:#0b0101;--line:#2a0606;--ink:#c8352a;--dim:#7a1f18;--dim2:#9a2a20;
+  --a:#e0402f;--b:#b8321f;--ok:#d23a2a;--bad:#ff2a1a;--warn:#c8401f;
+  --hdr:#030000;--nav:#030000;--field:#050000;--row:#170303;--sel:#2a0606;--meterbg:#170303;--mapbg:#000;--emrow:#2a0000;
+  --lcd:#ff3b2a;--lcdbg:#050000;--lcdline:#3a0808;--lcdglow:#ff2a1a55;--bezel:#3a0808;--gold:#a8321f;
+  --maptiles:invert(1) grayscale(1) brightness(.55) sepia(1) hue-rotate(-50deg) saturate(5) contrast(1.1)}
+:root[data-face="night"] body{filter:brightness(var(--dimmer,.85))}
+:root[data-face="night"]{--lcd2:#a8321f}
+:root[data-face="night"] #alarmbar{background:#3a0000;color:#ff7060}
+:root[data-face="night"] #alarmbar button{background:#1a0000;color:#ff6050;border:1px solid #5a0a0a}
+:root[data-face="night"] #flash.crit{border-color:#5a0000;animation:none}
+:root[data-face="night"] #flash.warn{border-color:#3a0800}
+:root[data-face="night"] .lcd{text-shadow:none}
+:root[data-face="night"] #demoTag .pill{background:#2a0505!important;color:#c8352a!important}
+:root[data-face="gold"]{--lcd:#ffc94a;--lcdglow:#ffb02066;--lcd2:#4fe39a}
+:root[data-face="gold"] .card h2,:root[data-face="rescue"] .card h2{color:var(--gold)}
+:root[data-face="gold"] .card{border:1px solid #3a3220;border-top:3px solid var(--bezel);box-shadow:inset 0 1px 0 #f2c14e22}
+:root[data-face="gold"] .brand b{color:var(--gold)}
+:root[data-face="gold"] nav button.on,:root[data-face="gold"] button.primary{border-color:var(--gold);color:var(--gold)}
+:root[data-face="gold"] .lcd{border:2px solid var(--bezel);box-shadow:inset 0 0 18px #000,0 0 0 3px #2a2414}
+:root[data-face="rescue"] .card{border-top:3px solid var(--a)}
+:root[data-face="rescue"] .brand b{color:var(--a)}
+:root[data-face="rescue"] .lcd{border:2px solid var(--gold)}
+:root[data-face="rescue"]{--lcd2:#f2b544}
+:root[data-face="night"] img:not(.leaflet-tile),:root[data-face="night"] svg{filter:saturate(0) sepia(1) hue-rotate(-50deg) saturate(6) brightness(.8)}
+:root[data-face="night"] .p-info,:root[data-face="night"] .p-ok,:root[data-face="night"] .chip{background:#1a0303;color:#c8352a}
+:root[data-face="night"] .p-warn{background:#5a1508;color:#ffb0a0}
+:root[data-face="night"] .meter i{background:linear-gradient(90deg,#5a0f0a,#c8352a 75%,#ff2a1a)}
+:root[data-face="night"] button.danger{color:#ff6a5a}
+:root[data-face="night"] #alarmbar.warn{background:#5a1508;color:#ffd0c0}
+.leaflet-tile-pane{filter:var(--maptiles)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:13px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+button{font:inherit;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:5px 11px;cursor:pointer}
+button:hover{border-color:var(--a)}button.primary{border-color:var(--a);color:var(--a)}button.danger{border-color:var(--bad);color:#ff8a96}
+button.hot{border-color:var(--warn);color:var(--warn);animation:pulse 1.4s infinite}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:8px 20px;padding:8px 14px;border-bottom:2px solid var(--bezel);background:var(--hdr)}
+.brand{display:flex;gap:10px;align-items:center}
+.brand b{font-size:17px;letter-spacing:.16em}.brand small{display:block;color:var(--dim);font-size:10px;letter-spacing:.14em}
+.stat{font-size:10px;color:var(--dim);letter-spacing:.06em}.stat b{display:block;font:700 17px var(--mono);color:var(--ink)}
+.sp{flex:1}
+nav{display:flex;gap:4px;padding:6px 14px;border-bottom:1px solid var(--line);background:var(--nav);flex-wrap:wrap}
+nav button{border-radius:99px;padding:4px 14px}nav button.on{border-color:var(--a);color:var(--a)}
+nav .count{background:var(--bad);color:#fff;border-radius:99px;padding:0 6px;margin-left:5px;font-size:10px}
+#alarmbar{display:none;align-items:center;gap:12px;padding:10px 14px;background:var(--bad);color:#fff;font-weight:700}
+#alarmbar.on{display:flex;animation:barflash .8s steps(2) infinite}#alarmbar.warn{background:var(--warn);color:#1b1200;animation:none}
+#alarmbar span{flex:1}#alarmbar button{background:#fff;color:#000;border:0;font-weight:800}
+.tab{display:none;height:calc(100vh - 110px)}.tab.on{display:block}
+.watch{display:grid;grid-template-columns:1fr 420px;height:100%}
+@media (max-width:1000px){.watch{grid-template-columns:1fr;height:auto}#map,#radar{height:55vh}.tab{height:auto}}
+.watch>div,aside{min-width:0}
+#map,#radar{height:100%;width:100%;min-height:360px;background:var(--mapbg)}#radar{display:none}
+aside{overflow:auto;border-left:1px solid var(--line);padding:10px;display:grid;gap:10px;align-content:start}
+.pad{padding:12px;overflow:auto;height:100%;display:grid;gap:12px;align-content:start;grid-template-columns:repeat(auto-fit,minmax(380px,1fr))}
+.card{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-top:2px solid var(--bezel);border-radius:12px;padding:10px;min-width:0}
+.card h2{margin:0 0 8px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);display:flex;gap:8px;align-items:center}
+.card h2 .sp{flex:1}.wide{grid-column:1/-1}
+.small{font-size:11px;color:var(--dim);overflow-wrap:anywhere}
+.rx{border:1px solid var(--line);border-radius:10px;padding:8px;margin-bottom:8px;background:var(--field)}
+.rx .top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.led{display:inline-block;width:9px;height:9px;border-radius:50%;background:#3a4a5a;margin-right:6px}
+.led.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}.led.err{background:var(--bad)}.led.rec{background:var(--bad);box-shadow:0 0 8px var(--bad);animation:blink .8s steps(2) infinite}
+.meter{height:7px;border-radius:4px;background:var(--meterbg);overflow:hidden;margin:6px 0 4px;position:relative}
+.meter i{display:block;height:100%;background:linear-gradient(90deg,#2ee6a6,#ffd34d 75%,#ff4d5e);transition:width .3s}
+.meter u{position:absolute;top:0;bottom:0;width:2px;background:#fff8}
+.seg{display:flex;gap:4px}.seg button{font-size:11px;padding:2px 9px}.seg button.on{border-color:var(--a);color:var(--a)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;font-size:10px;color:var(--dim);font-weight:500;letter-spacing:.08em;text-transform:uppercase;padding:4px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
+td{padding:4px;border-bottom:1px solid var(--row);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
+tr.click{cursor:pointer}tr.click:hover td{background:var(--row)}tr.sel td{background:var(--sel)}tr.em td{background:var(--emrow)}
+.scroll{max-height:330px;overflow:auto}
+.dotc{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:12px}.kv dt{color:var(--dim)}.kv dd{margin:0;font-family:var(--mono);overflow-wrap:anywhere}
+.log{font:11px/1.5 var(--mono);color:var(--dim2);max-height:170px;overflow:auto;white-space:pre}
+.pill{display:inline-block;padding:1px 7px;border-radius:99px;font-size:10px;font-weight:700;white-space:nowrap}
+.p-crit{background:var(--bad);color:#fff}.p-warn{background:var(--warn);color:#1b1200}.p-info{background:#22324a;color:#a9c1e0}.p-ok{background:#0f3a2c;color:#7af0c4}
+.alert{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;padding:8px 2px;border-bottom:1px solid var(--row)}
+.alert .pill{align-self:start}.alert.acked{opacity:.45}.alert b{font-size:13px}.alert p{margin:2px 0 0;color:var(--dim);font-size:12px}
+input.search,input.txt,textarea{background:var(--field);border:1px solid var(--line);color:var(--ink);border-radius:7px;padding:4px 7px;font:inherit}
+textarea{width:100%;min-height:110px;font:12px/1.5 var(--mono)}
+pre.script{background:var(--field);border:1px solid var(--line);border-radius:8px;padding:10px;white-space:pre-wrap;font:12px/1.5 var(--mono);margin:0}
+audio{height:28px;max-width:220px;vertical-align:middle}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.big{font:700 22px var(--mono)}
+#flash{position:fixed;inset:0;pointer-events:none;z-index:2000}
+#flash.crit{animation:redflash .9s infinite;border:10px solid var(--bad)}#flash.warn{border:5px solid var(--warn);opacity:.7}
+.leaflet-container{background:var(--mapbg)}
+.lcd{font:700 46px/1 var(--mono);color:var(--lcd);text-shadow:0 0 12px var(--lcdglow);letter-spacing:.04em;background:var(--lcdbg);border:1px solid var(--lcdline);border-radius:10px;padding:10px 16px;display:inline-block}
+.lcd small{font-size:16px;color:var(--lcd2,#33d6ff);margin-left:10px;text-shadow:none}
+.hfgrid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:12px;padding:12px;overflow:auto;height:100%;align-content:start}
+@media (max-width:1000px){.hfgrid{grid-template-columns:1fr}}
+#wf{width:100%;height:260px;background:#000;border-radius:8px;image-rendering:pixelated;display:block}
+.wfax{display:flex;justify-content:space-between;font:10px var(--mono);color:var(--dim)}
+select{background:var(--field);border:1px solid var(--line);color:var(--ink);border-radius:7px;padding:4px 6px;font:inherit;max-width:100%}
+.tog{display:inline-flex;gap:5px;align-items:center;font-size:12px}
+.chip{display:inline-block;padding:1px 7px;border-radius:6px;background:var(--row);font:11px var(--mono);margin:1px}
+.pulse{animation:pulsering 1s infinite}
+@keyframes blink{50%{opacity:.25}}@keyframes pulse{50%{opacity:.5}}@keyframes barflash{50%{background:#a3001a}}
+@keyframes redflash{0%,100%{background:rgba(255,0,30,0)}50%{background:rgba(255,0,30,.2)}}
+@keyframes pulsering{0%{transform:scale(.6);opacity:1}100%{transform:scale(1.8);opacity:0}}
+
+/* ---------- console view (large monitors) ---------- */
+#t-console{height:calc(100vh - 104px)}
+.console{display:grid;height:100%;gap:8px;padding:8px;
+  grid-template-columns:minmax(0,1.55fr) minmax(0,1fr) minmax(0,.9fr);
+  grid-template-rows:minmax(0,1.25fr) minmax(0,1fr) minmax(0,.62fr);
+  grid-template-areas:"chart hf alerts" "chart wf alerts" "ais calls data"}
+.console>.card{overflow:hidden;display:flex;flex-direction:column}
+.console .body{overflow:auto;flex:1;min-height:0}
+#cMap{flex:1;min-height:0;border-radius:8px;background:var(--mapbg)}
+.c-chart{grid-area:chart}.c-hf{grid-area:hf}.c-wf{grid-area:wf}.c-alerts{grid-area:alerts}.c-ais{grid-area:ais}.c-calls{grid-area:calls}.c-data{grid-area:data}
+.c-lcd{font:700 clamp(34px,3.6vw,72px)/1 var(--mono)}
+.c-lcd small{font-size:.32em}
+#wf2{width:100%;flex:1;min-height:0;background:#000;border-radius:8px;image-rendering:pixelated}
+.c-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px}
+.c-stats div{background:var(--field);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:10px;color:var(--dim);letter-spacing:.08em}
+.c-stats b{display:block;font:700 clamp(16px,1.4vw,26px) var(--mono);color:var(--ink)}
+.ticker{font:12px/1.55 var(--mono);color:var(--dim2)}
+.ticker div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid var(--row);padding:2px 0}
+.ticker .crit{color:var(--bad);font-weight:700}.ticker .warn{color:var(--warn)}
+.gauge{display:flex;gap:10px;align-items:center}
+.gauge .meter{flex:1;height:12px}
+@media (max-width:1200px){.console{grid-template-columns:1fr;grid-template-rows:none;grid-template-areas:"chart" "hf" "wf" "alerts" "ais" "calls" "data";height:auto}
+  #t-console{height:auto}#cMap{height:55vh;flex:none}#wf2{height:200px;flex:none}}
+.face{display:flex;gap:6px;align-items:center}
+.face select{padding:3px 6px}
+#dimmer{width:80px;display:none}:root[data-face="night"] #dimmer{display:inline-block}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><svg width="30" height="30" viewBox="0 0 40 40"><circle cx="20" cy="20" r="18" fill="none" stroke="#33d6ff" stroke-width="2"/>
+    <path d="M7 25c4-4 8-4 12 0s8 4 12 0" fill="none" stroke="#2ee6a6" stroke-width="2.5" stroke-linecap="round"/><path d="M20 6v13M14 12h12" stroke="#33d6ff" stroke-width="2"/></svg>
+    <div><b>OCEAN CITY WATCH</b><small id="stationLine">AIS &amp; SAR WATCH · RECEIVE-ONLY</small></div></div>
+  <div class="stat">Vessels<b id="sVessels">0</b></div>
+  <div class="stat">Msg/min<b id="sRate">0</b></div>
+  <div class="stat">Best range<b id="sRange">–</b></div>
+  <div class="stat">UTC<b id="sUtc">–</b></div>
+  <span id="demoTag"></span><span class="sp"></span>
+  <div class="face" title="Faceplate"><select id="faceSel">
+      <option value="ocean">Ocean City (blue · green · red)</option><option value="gold">Admiralty Gold</option>
+      <option value="rescue">Rescue Red</option><option value="night">Night (red, dim)</option></select>
+    <label class="small" title="Switch to the night faceplate between sunset and sunrise at the station"><input type="checkbox" id="autoNight"> auto night</label>
+    <input type="range" id="dimmer" min="0.35" max="1" step="0.05" title="Night brightness"></div>
+  <button id="arm" class="hot" title="Browsers allow sound only after a click">🔈 Arm alarm sound</button>
+  <button id="snapBtn">📸 Snapshot</button>
+  <button id="ackAll">Acknowledge all</button>
+</header>
+<div id="alarmbar"><span id="alarmtext"></span><button id="alarmAck">ACKNOWLEDGE</button></div>
+<nav id="tabs">
+  <button data-t="console">▣ Console</button>
+  <button data-t="watch" class="on">Watch</button>
+  <button data-t="emerg">Emergencies <span class="count" id="emCount" hidden></span></button>
+  <button data-t="dsc">DSC</button>
+  <button data-t="hf">HF radio</button>
+  <button data-t="air">Aviation &amp; data</button>
+  <button data-t="tl">Timeline</button>
+  <button data-t="traffic">Traffic watch</button>
+  <button data-t="cov">Coverage</button>
+  <button data-t="rec">SAR recorder</button>
+  <button data-t="ann">Broadcast</button>
+  <button data-t="sys">Station &amp; sharing</button>
+</nav>
+
+
+<section class="tab" id="t-console"><div class="console">
+  <div class="card c-chart"><h2><span>Chart · vessels, aircraft, radiosondes</span><span class="sp"></span><span class="small" id="cChartInfo"></span></h2><div id="cMap"></div></div>
+  <div class="card c-hf"><h2><span>HF receiver</span><span class="sp"></span><span id="cScan"></span></h2>
+    <div class="body">
+      <div class="row" style="gap:14px;align-items:center"><div class="lcd c-lcd" id="cLcd">-----.- <small>USB</small></div>
+        <div style="flex:1;min-width:160px"><div class="small" id="cChan">–</div><div class="small" id="cRig"></div>
+          <div class="row" style="margin-top:6px"><span class="tog"><span class="led" id="cVoice"></span>signal</span><span class="tog"><span class="led" id="cRec"></span>rec</span></div></div></div>
+      <div class="gauge" style="margin-top:8px"><span class="small" style="width:70px">S/N <b id="cSnr">0</b> dB</span><div class="meter"><i id="cSnrBar" style="width:0"></i></div></div>
+      <div class="row" style="margin-top:8px"><input class="txt" id="cKhz" placeholder="kHz" style="width:110px" inputmode="decimal">
+        <select id="cMode"><option>USB</option><option>LSB</option><option>AM</option><option>FM</option></select>
+        <button class="primary" id="cTune">Tune</button><button id="cDn">−1</button><button id="cUp">+1</button>
+        <select id="cList" style="flex:1;min-width:120px"></select><button id="cScanBtn">Scan</button><button id="cStop">Stop</button></div>
+      <div class="row small" style="margin-top:6px"><label class="tog"><input type="checkbox" id="cNr"> NR</label><label class="tog"><input type="checkbox" id="cNotch"> Notch</label>
+        <label class="tog"><input type="checkbox" id="cAgc"> AGC</label><span id="cNotched"></span></div>
+      <h2 style="margin-top:10px">Recent on HF</h2><div class="ticker" id="cHeard"></div>
+    </div></div>
+  <div class="card c-wf"><h2><span>Waterfall 0 – 3 kHz</span><span class="sp"></span><span class="small" id="cSel"></span></h2><canvas id="wf2" width="96" height="240"></canvas>
+    <div class="wfax"><span>0</span><span>1k</span><span>2k</span><span>3 kHz</span></div></div>
+  <div class="card c-alerts"><h2><span>Alerts</span><span class="sp"></span><span id="cAlertCount"></span></h2><div class="body" id="cAlerts"></div></div>
+  <div class="card c-ais"><h2>Station</h2><div class="body">
+    <div class="c-stats"><div>VESSELS<b id="cV">0</b></div><div>AIRCRAFT<b id="cA">0</b></div><div>MSG/MIN<b id="cR">0</b></div><div>UTC<b id="cT">–</b></div></div>
+    <div id="cRxs" class="small"></div></div></div>
+  <div class="card c-calls"><h2>DSC · SELCAL</h2><div class="body ticker" id="cCalls"></div></div>
+  <div class="card c-data"><h2>Timeline</h2><div class="body ticker" id="cTl"></div></div>
+</div></section>
+
+<section class="tab on" id="t-watch"><div class="watch">
+  <div><div id="map"></div><svg id="radar" viewBox="-110 -110 220 220"></svg></div>
+  <aside>
+    <div class="card"><h2>AIS receivers</h2><div id="rxs"></div><div class="small" id="outs"></div></div>
+    <div class="card"><h2>Selected vessel</h2><div id="detail" class="small">Click a ship on the chart or in the list.</div></div>
+    <div class="card"><h2><span>Vessels</span><span class="sp"></span><input class="search" id="q" placeholder="Name, MMSI…"></h2>
+      <div class="scroll"><table><thead><tr><th>Name / MMSI</th><th>Type</th><th>Kn</th><th>Range</th><th>Seen</th></tr></thead><tbody id="list"></tbody></table></div></div>
+    <div class="card"><h2>Live NMEA</h2><div class="log" id="log"></div></div>
+  </aside></div></section>
+
+<section class="tab" id="t-emerg"><div class="pad">
+  <div class="card"><h2><span>Alerts</span><span class="sp"></span><span id="alertCount"></span></h2><div class="scroll" style="max-height:60vh" id="alerts"></div></div>
+  <div class="card"><h2>Incident files</h2><div id="incidents"></div>
+    <p class="small">Each incident folder holds a printable report (position, track, vessels nearby that could assist, draft MAYDAY RELAY),
+    the raw AIS data and copies of voice recordings made during the incident.</p></div>
+</div></section>
+
+<section class="tab" id="t-dsc"><div class="pad">
+  <div class="card"><h2>DSC receivers (VHF Ch70 and HF, receive-only)</h2><div id="dscRx"></div>
+    <p class="small">Distress alerts and relays raise an emergency, put the casualty on the chart and open an incident.
+      Urgency calls raise a warning; safety, routine and test calls are logged. Daily DSC logs are kept in data/logs.</p></div>
+  <div class="card wide"><h2>DSC calls heard</h2><div class="scroll" style="max-height:60vh"><table><thead><tr><th>Time (UTC)</th><th>Call</th><th>From MMSI</th>
+    <th>To / about</th><th>Details</th><th>Check</th></tr></thead><tbody id="dscLog"></tbody></table></div></div>
+</div></section>
+
+
+<section class="tab" id="t-hf"><div class="hfgrid">
+  <div class="card"><h2><span>HF receiver</span><span class="sp"></span><select id="hfRx"></select></h2>
+    <div class="row" style="align-items:flex-end;gap:14px"><div class="lcd" id="hfLcd">-----.- <small>USB</small></div>
+      <div><div class="small" id="hfChan">–</div><div class="small" id="hfRig">–</div>
+        <div class="row" style="margin-top:4px"><span class="tog"><span class="led" id="hfVoice"></span>signal</span>
+          <span class="tog"><span class="led" id="hfRec"></span>recording</span><span class="tog" id="hfScanTag"></span></div></div></div>
+    <div style="margin-top:10px"><div class="small">Signal above noise <b id="hfSnr">0</b> dB · audio <span id="hfLvl">–</span> dBFS <span id="hfNotch"></span></div>
+      <div class="meter"><i id="hfSnrBar" style="width:0"></i></div></div>
+    <h2 style="margin-top:12px">Dial frequency</h2>
+    <div class="row"><input class="txt" id="hfKhz" placeholder="kHz e.g. 8846" style="width:120px" inputmode="decimal">
+      <select id="hfMode"><option>USB</option><option>LSB</option><option>AM</option><option>FM</option></select>
+      <label class="small">offset <input class="txt" id="hfOff" value="0" style="width:60px"> kHz</label>
+      <button class="primary" id="hfTune">Tune</button>
+      <button id="hfDn" title="−1 kHz">−1</button><button id="hfUp" title="+1 kHz">+1</button></div>
+    <div class="small">Type the published frequency. Use offset −1.7 for HF DSC or −1.44 for HFDL; voice channels need none.</div>
+    <h2 style="margin-top:12px">Channels</h2>
+    <div class="row"><select id="hfGroup" style="flex:1"></select><select id="hfCh"></select><button id="hfGo">Tune</button></div>
+    <h2 style="margin-top:12px">Scan</h2>
+    <div class="row"><select id="hfList" style="flex:1"></select><button class="primary" id="hfScan">Scan</button><button id="hfStop">Stop</button></div>
+    <div class="small">Scanning stops on any signal, records it, and moves on a few seconds after it ends.</div>
+    <h2 style="margin-top:12px">Computer processing</h2>
+    <div class="row"><label class="tog"><input type="checkbox" id="dNr"> Noise reduction</label>
+      <label class="tog"><input type="checkbox" id="dNotch"> Auto-notch</label><label class="tog"><input type="checkbox" id="dAgc"> AGC</label>
+      <label class="tog">strength <input type="range" id="dStr" min="0.6" max="3" step="0.1" style="width:90px"></label></div>
+    <div class="row" id="spkRow"><label class="tog">PC speaker volume <input type="range" id="dVol" min="0" max="2" step="0.05" style="width:110px"></label>
+      <label class="tog"><input type="checkbox" id="dMute"> Mute</label></div>
+  </div>
+  <div class="card"><h2>Waterfall (receiver passband 0 – 3 kHz)</h2><canvas id="wf" width="96" height="240"></canvas>
+    <div class="wfax"><span>0</span><span>500</span><span>1000</span><span>1500</span><span>2000</span><span>2500</span><span>3000 Hz</span></div>
+    <p class="small">SELCAL tones sit at 312–1479 Hz, HF DSC at 1615/1785 Hz (with −1.7 kHz offset), HFDL is a 2.4 kHz-wide block.</p></div>
+  <div class="card"><h2><span>SELCAL calls</span><span class="sp"></span><span class="small" id="selN"></span></h2>
+    <div class="scroll"><table><thead><tr><th>Time (UTC)</th><th>Code</th><th>kHz</th><th>Where</th><th>Watch</th></tr></thead><tbody id="selLog"></tbody></table></div>
+    <p class="small">Add codes to watch under <code>hf_receivers → selcal_watch</code> in config.json, e.g. <code>"AB-CD": "8P-ABC"</code>; a watched code raises an alert.</p></div>
+  <div class="card"><h2>Transmissions heard</h2><div class="scroll"><table><thead><tr><th>Time (UTC)</th><th>kHz</th><th>Channel</th><th>Length</th></tr></thead><tbody id="hfHeard"></tbody></table></div>
+    <p class="small">Recordings are in the SAR recorder tab and in the Timeline.</p></div>
+</div></section>
+
+<section class="tab" id="t-air"><div class="pad">
+  <div class="card"><h2><span>Aircraft heard (HFDL / ACARS)</span><span class="sp"></span><span class="small" id="acN"></span></h2>
+    <div class="scroll"><table><thead><tr><th>Flight</th><th>Reg</th><th>Position</th><th>Via</th><th>Msgs</th><th>Seen</th></tr></thead><tbody id="acList"></tbody></table></div>
+    <p class="small">Aircraft with a position are drawn on the Watch chart (yellow).</p></div>
+  <div class="card"><h2>Radiosondes (RS41)</h2><div id="sondeRx"></div>
+    <div class="scroll"><table><thead><tr><th>Serial</th><th>Altitude</th><th>Climb</th><th>Speed</th><th>Position</th><th>Status</th><th>Seen</th></tr></thead><tbody id="sondeList"></tbody></table></div></div>
+  <div class="card wide"><h2>HFDL · HF ACARS · CPDLC <span class="sp"></span><span class="small" id="fHfdl"></span></h2>
+    <div class="scroll" style="max-height:300px"><table><thead><tr><th>Time</th><th>Flight / reg</th><th>kHz</th><th>Ground station</th><th>Message</th></tr></thead><tbody id="hfdlLog"></tbody></table></div></div>
+  <div class="card"><h2>Inmarsat-C SafetyNET (Scytale-C) <span class="sp"></span><span class="small" id="fInm"></span></h2><div class="scroll" style="max-height:380px" id="inmLog"></div></div>
+  <div class="card"><h2>ACARS (JAERO / other) <span class="sp"></span><span class="small" id="fAcars"></span></h2>
+    <div class="scroll" style="max-height:380px"><table><thead><tr><th>Time</th><th>Flight / reg</th><th>Label</th><th>Message</th></tr></thead><tbody id="acarsLog"></tbody></table></div></div>
+  <div class="card wide"><h2>Data feed setup</h2><div id="feedSt" class="small"></div></div>
+</div></section>
+
+<section class="tab" id="t-tl"><div class="pad">
+  <div class="card wide"><h2><span>Station timeline</span><span class="sp"></span><span class="seg" id="tlF">
+    <button data-f="" class="on">All</button><button data-f="alert">Alerts</button><button data-f="hf">HF</button><button data-f="selcal">SELCAL</button>
+    <button data-f="recording">Recordings</button><button data-f="hfdl,acars,inmarsat">Data</button><button data-f="sonde">Sondes</button></span></h2>
+    <div class="scroll" style="max-height:72vh"><table><thead><tr><th>Time (UTC)</th><th>Kind</th><th>Source</th><th>What happened</th></tr></thead><tbody id="tlBody"></tbody></table></div>
+    <p class="small">Everything the station hears and does, in one list. Saved daily as data/logs/timeline-YYYYMMDD.log.</p></div>
+</div></section>
+
+<section class="tab" id="t-traffic"><div class="pad">
+  <div class="card"><h2>Collision risk (CPA &lt; limit within the time window)</h2><div id="risks"></div></div>
+  <div class="card"><h2>AIS gaps: vessels that went silent</h2><div id="dark"></div></div>
+  <div class="card"><h2>Anchor watch</h2><div id="anchors"></div></div>
+  <div class="card"><h2>AIS channels</h2><div id="chans"></div></div>
+  <div class="card"><h2>Geofence zones</h2><div id="zones"></div>
+    <div class="row" style="margin-top:8px"><input class="txt" id="zName" placeholder="Zone name" style="width:140px">
+      <select id="zType" class="txt"><option>reef</option><option>restricted</option><option>harbour</option><option>anchorage</option><option>marine park</option><option>custom</option></select>
+      <input class="txt" id="zLat" placeholder="Lat" style="width:90px"><input class="txt" id="zLon" placeholder="Lon" style="width:90px">
+      <input class="txt" id="zRad" placeholder="Radius nm" style="width:80px"><button class="primary" id="zAdd">Add zone</button></div>
+    <p class="small">Tip: click the chart on the Watch tab to fill in a position. Polygon zones can be added in data/zones.json.</p></div>
+  <div class="card"><h2>Watchlist</h2><div id="wlist"></div>
+    <div class="row" style="margin-top:8px"><input class="txt" id="wMmsi" placeholder="MMSI" style="width:110px"><input class="txt" id="wLabel" placeholder="Label" style="width:140px">
+      <input class="txt" id="wNote" placeholder="Note" style="width:140px"><select id="wLevel" class="txt"><option value="info">Info</option><option value="warn">Warning</option><option value="crit">Emergency</option></select>
+      <button class="primary" id="wAdd">Add</button></div></div>
+</div></section>
+
+<section class="tab" id="t-cov"><div class="pad">
+  <div class="card"><h2>Reception range by bearing (best ever)</h2><svg id="polar" viewBox="-120 -120 240 240" style="width:100%;max-width:520px"></svg></div>
+  <div class="card"><h2>About coverage</h2><div class="small" id="covInfo"></div>
+    <div class="row" style="margin-top:8px"><label class="small"><input type="checkbox" id="covToggle"> Show where ships are heard on the Watch chart</label></div></div>
+</div></section>
+
+<section class="tab" id="t-rec"><div class="pad">
+  <div class="card"><h2>Voice recorders</h2><div id="recorders"></div>
+    <p class="small">Each recorder saves a timestamped file whenever someone speaks, with a short pre-roll so the first words aren't lost.
+      Add your VHF Ch16 radio, IC-M710 and Barrett 2050 audio outputs under <code>recorders</code> in config.json.</p></div>
+  <div class="card"><h2>Recent recordings</h2><div class="scroll" style="max-height:62vh"><table><thead><tr><th>Time (UTC)</th><th>Source</th><th>Length</th><th>Listen</th></tr></thead><tbody id="recs"></tbody></table></div></div>
+</div></section>
+
+<section class="tab" id="t-ann"><div class="pad">
+  <div class="card"><h2>Station identification</h2><dl class="kv" id="ident"></dl>
+    <h2 style="margin-top:12px">Announcement script</h2><pre class="script" id="script"></pre>
+    <div class="row" style="margin-top:8px"><button id="copyScript">Copy script</button><button id="ttsBtn">Make spoken version (text-to-speech)</button></div>
+    <p class="small">Change the wording with <code>announcement_template</code> and <code>announcement_extra</code> in config.json.</p></div>
+  <div class="card"><h2>Broadcast composer</h2>
+    <div class="row"><select id="cKind" class="txt"></select><input class="txt" id="cTitle" placeholder="Title / area" style="width:170px">
+      <input class="txt" id="cChan" placeholder="Channel" style="width:70px"></div>
+    <div class="row" style="margin-top:6px"><input class="txt" id="cLat" placeholder="Lat (optional)" style="width:110px"><input class="txt" id="cLon" placeholder="Lon (optional)" style="width:110px">
+      <span class="small">or click the chart on the Watch tab</span></div>
+    <textarea id="cNotes" style="margin-top:6px;min-height:60px" placeholder="Details / operator notes, e.g. 'Unlit buoy adrift 2 nm west of Needham's Point, vessels keep clear'"></textarea>
+    <div class="row" style="margin-top:6px"><button id="cFill">Fill from template</button><button id="cAi" class="primary">✨ Draft with AI</button>
+      <label class="small"><input type="checkbox" id="cUseInc"> include current incident data</label></div>
+    <h2 style="margin-top:10px">Script (review and edit before use)</h2>
+    <textarea id="cText" style="min-height:140px"></textarea>
+    <div class="row" style="margin-top:6px"><input class="txt" id="cName" value="broadcast" style="width:150px"><button id="cTts">🔊 Make audio (text-to-speech)</button><span class="small" id="cState"></span></div></div>
+  <div class="card"><h2>Record your own voice</h2>
+    <div class="row"><input class="txt" id="recName" value="station-id" style="width:160px"><button id="micBtn" class="primary">● Record</button><span class="small" id="micState"></span></div>
+    <p class="small">Records from this computer's microphone and saves it to the library.</p>
+    <h2 style="margin-top:12px">Audio library: select one, then Press To Play</h2><div id="annList"></div>
+    <button id="ptp" style="margin-top:10px;width:100%;padding:16px;font-size:18px;font-weight:800;letter-spacing:.1em;background:#3a0d14;border:2px solid var(--bad);color:#fff">▶ PRESS TO PLAY</button>
+    <p class="small" id="annOut"></p>
+    <div class="small" style="border-top:1px solid var(--line);padding-top:8px;margin-top:8px">
+      <b style="color:var(--ink)">Broadcasting is always operator-controlled.</b> "Play to radio" sends the audio to the output set in config.json
+      (your marine radio's audio/mic input). You select the channel, check it's clear, and key the transmitter yourself, or use the radio's own VOX/data
+      interface. Ocean City Watch never keys a radio. Make routine broadcasts on a working channel, not Ch16, as your licence and MRCC procedures require.</div></div>
+</div></section>
+
+<section class="tab" id="t-sys"><div class="pad">
+  <div class="card"><h2>Station</h2><dl class="kv" id="sysStation"></dl></div>
+  <div class="card"><h2><span>Alert forwarding</span><span class="sp"></span><button id="testNotify">Send test</button></h2><div id="notify" class="small"></div></div>
+  <div class="card"><h2>Message statistics</h2><div id="byType" class="small"></div></div>
+  <div class="card"><h2>Sharing with AIS networks</h2><div id="share" class="small"></div></div>
+  <div class="card"><h2>Data & recordings</h2><div class="small" id="files">Daily AIS logs are in <code>data/logs</code>, snapshots in <code>data/snapshots</code>,
+    incidents in <code>data/incidents</code>, voice recordings in <code>data/recordings</code>.</div><div id="snapResult" class="small"></div></div>
+</div></section>
+<div id="flash"></div>
+<div id="ptpModal" style="display:none;position:fixed;inset:0;background:#000b;z-index:3000;align-items:center;justify-content:center">
+  <div class="card" style="max-width:460px;border-color:var(--bad)"><h2>Before you play to the radio</h2>
+    <div id="ptpFile" class="small" style="margin-bottom:8px"></div>
+    <label class="small" style="display:block;margin:6px 0"><input type="checkbox" class="ptpc"> The correct working channel is selected (not Ch16 for routine traffic)</label>
+    <label class="small" style="display:block;margin:6px 0"><input type="checkbox" class="ptpc"> I have listened and the channel is clear</label>
+    <label class="small" style="display:block;margin:6px 0"><input type="checkbox" class="ptpc"> I have reviewed the script and I will key the transmitter (or the radio's VOX is set)</label>
+    <div class="row" style="margin-top:10px"><button id="ptpGo" class="danger" disabled>▶ Play now</button><button id="ptpCancel">Cancel</button></div>
+    <p class="small">Ocean City Watch never keys a radio. It only plays this audio into the radio's audio input.</p></div></div>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const ago = t => { if (!t) return "–"; const s = Math.max(0, Date.now()/1000 - t); return s < 60 ? Math.round(s)+"s" : s < 3600 ? Math.round(s/60)+"m" : Math.round(s/3600)+"h"; };
+const utc = (t, full) => { const d = new Date(t * 1000).toISOString(); return full ? d.slice(0,19).replace("T"," ") + "Z" : d.slice(11,19); };
+const api = async (path, body, raw, headers) => {
+  const r = await fetch(path, {method: "POST", headers: {"X-OCW": "1", ...(raw ? {} : {"Content-Type": "application/json"}), ...(headers||{})}, body: raw || JSON.stringify(body || {})});
+  const j = await r.json().catch(() => ({})); if (!r.ok || j.ok === false) alert(j.error || "Request failed"); poll(); return j; };
+const COLOR = {A:"#33d6ff", B:"#ffb020", "Base station":"#e8eef5", AtoN:"#e05cff", "SAR aircraft":"#7cff6b"};
+const color = v => v.emergency?.level === "crit" ? "#ff3b4e" : COLOR[v.cls] || "#9fb6cb";
+let selected = null, last = null, map = null, layer = null, markers = {}, inited = false, tab = "watch";
+let zoneLayer = null, covLayer = null, riskLayer = null, zoneSig = "", covSig = "", annSel = null;
+const ZCOL = {reef: "#ff6a3d", restricted: "#ff3b4e", harbour: "#5a8cff", anchorage: "#2ee6a6", "marine park": "#7cff6b", custom: "#e05cff"};
+
+document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => { tab = b.dataset.t; try { localStorage.setItem("ocw.tab", tab); } catch (e) {}
+  document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x === b));
+  document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x.id === "t-" + tab));
+  if (map) setTimeout(() => map.invalidateSize(), 50); if (cMap) setTimeout(() => cMap.invalidateSize(), 50); render(last); });
+
+/* ---------------- sound ---------------- */
+let actx = null, lastSiren = 0; const seen = new Set(); let firstLoad = true;
+function tone(f0, f1, t0, d, type = "sawtooth", vol = .14) { const o = actx.createOscillator(), g = actx.createGain(); o.type = type;
+  o.frequency.setValueAtTime(f0, t0); o.frequency.linearRampToValueAtTime(f1, t0 + d);
+  g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(vol, t0 + .02); g.gain.setValueAtTime(vol, t0 + d - .03); g.gain.linearRampToValueAtTime(0, t0 + d);
+  o.connect(g).connect(actx.destination); o.start(t0); o.stop(t0 + d); }
+const siren = () => { if (!actx) return; const t = actx.currentTime; for (let i = 0; i < 4; i++) { tone(650, 1400, t + i * .5, .25); tone(1400, 650, t + i * .5 + .25, .25); } };
+const beep = () => { if (!actx) return; const t = actx.currentTime; tone(880, 880, t, .14, "square", .08); tone(880, 880, t + .22, .14, "square", .08); };
+$("#arm").onclick = async () => { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); await actx.resume();
+  $("#arm").classList.remove("hot"); $("#arm").textContent = "🔊 Alarm armed"; beep();
+  if ("Notification" in window && Notification.permission === "default") Notification.requestPermission(); };
+function notify(a) { try { if ("Notification" in window && Notification.permission === "granted")
+  new Notification("Ocean City Watch: " + a.title, {body: a.detail, requireInteraction: a.level === "crit"}); } catch (e) {} }
+
+/* ---------------- chart ---------------- */
+function shipSvg(v) {
+  const c = color(v);
+  if (v.emergency?.level === "crit") return `<svg width="34" height="34" viewBox="-17 -17 34 34"><circle r="12" fill="none" stroke="#ff3b4e" stroke-width="3" class="pulse" style="transform-origin:0 0"/>
+    <circle r="7" fill="#ff3b4e" stroke="#fff" stroke-width="1.5"/><path d="M-4-4 4 4M4-4-4 4" stroke="#fff" stroke-width="2"/></svg>`;
+  if (v.cls === "Base station") return `<svg width="16" height="16" viewBox="-8 -8 16 16"><rect x="-5" y="-5" width="10" height="10" fill="${c}" stroke="#000"/></svg>`;
+  if (v.cls === "AtoN") return `<svg width="16" height="16" viewBox="-8 -8 16 16"><path d="M0-7 7 0 0 7-7 0Z" fill="${c}" stroke="#000"/></svg>`;
+  if (v.cls === "SAR aircraft") return `<svg width="26" height="26" viewBox="-13 -13 26 26" style="transform:rotate(${v.cog ?? 0}deg)"><path d="M0-11 2-3 11 1 11 3 2 1 1 8 4 10 4 11 0 10-4 11-4 10-1 8-2 1-11 3-11 1-2-3Z" fill="${c}" stroke="#000"/></svg>`;
+  const rot = v.heading ?? v.cog ?? 0, moving = (v.sog || 0) > .5;
+  return `<svg width="26" height="26" viewBox="-13 -13 26 26" style="transform:rotate(${rot}deg)">${moving ? `<line x1="0" y1="-7" x2="0" y2="-13" stroke="${c}" stroke-width="1.5"/>` : ""}
+    <path d="M0-8 5 7 0 4-5 7Z" fill="${c}" stroke="#001"/></svg>`;
+}
+function initMap(st) {
+  if (typeof L === "undefined") { $("#map").style.display = "none"; $("#radar").style.display = "block"; return; }
+  map = L.map("map").setView([st.lat ?? 13.1, st.lon ?? -59.6], 10);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom: 17,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
+  zoneLayer = L.layerGroup().addTo(map); covLayer = L.layerGroup(); riskLayer = L.layerGroup().addTo(map);
+  layer = L.layerGroup().addTo(map);
+  map.on("click", e => { const la = e.latlng.lat.toFixed(5), lo = e.latlng.lng.toFixed(5);
+    ["zLat", "cLat"].forEach(id => $("#" + id).value = la); ["zLon", "cLon"].forEach(id => $("#" + id).value = lo);
+    L.popup().setLatLng(e.latlng).setContent(`${la}, ${lo}<br><small>Copied to the zone and broadcast forms</small>`).openOn(map); });
+  if (st.lat != null) {
+    L.marker([st.lat, st.lon], {icon: L.divIcon({className: "", iconSize: [18, 18], iconAnchor: [9, 9],
+      html: `<svg width="18" height="18" viewBox="-9 -9 18 18"><path d="M0-8 7 6-7 6Z" fill="#2ee6a6" stroke="#012" stroke-width="1.5"/></svg>`})})
+      .addTo(map).bindTooltip(`${esc(st.name)} ${esc(st.callsign || "")} · ${esc(st.grid || "")}`);
+    [10, 20, 40].forEach(nm => L.circle([st.lat, st.lon], {radius: nm * 1852, color: "#2ee6a6", weight: 1, opacity: .25, fill: false, dashArray: "4 6"}).addTo(map));
+  }
+}
+function drawMap(s) {
+  const seenM = new Set();
+  for (const v of s.vessels) {
+    if (v.lat == null) continue; seenM.add(v.mmsi);
+    const em = v.emergency?.level === "crit", sz = em ? 34 : 26;
+    const icon = L.divIcon({html: shipSvg(v), className: "", iconSize: [sz, sz], iconAnchor: [sz / 2, sz / 2]});
+    let m = markers[v.mmsi];
+    if (!m) { m = markers[v.mmsi] = {mk: L.marker([v.lat, v.lon], {icon, zIndexOffset: em ? 1000 : 0}).addTo(layer), tr: L.polyline([], {weight: 1.5, opacity: .5}).addTo(layer)};
+      m.mk.on("click", () => select(v.mmsi)); }
+    else { m.mk.setLatLng([v.lat, v.lon]); m.mk.setIcon(icon); m.mk.setZIndexOffset(em ? 1000 : 0); }
+    m.mk.bindTooltip(esc(v.name || v.mmsi) + (em ? " — " + esc(v.emergency.kind) : ""), {direction: "top", offset: [0, -10]});
+    m.tr.setStyle({color: color(v)}); m.tr.setLatLngs(v.track || []);
+  }
+  for (const k of Object.keys(markers)) if (!seenM.has(+k)) { layer.removeLayer(markers[k].mk); layer.removeLayer(markers[k].tr); delete markers[k]; }
+  const w = s.watch, zs = JSON.stringify(w.zones);
+  if (zs !== zoneSig) { zoneSig = zs; zoneLayer.clearLayers();
+    for (const z of w.zones) { const o = {color: ZCOL[z.type] || "#e05cff", weight: 1.5, fillOpacity: .12, dashArray: "5 4"};
+      const shape = z.polygon ? L.polygon(z.polygon, o) : L.circle([z.lat, z.lon], {...o, radius: z.radius_nm * 1852});
+      shape.bindTooltip(`${esc(z.name)} (${esc(z.type)})`).addTo(zoneLayer); } }
+  riskLayer.clearLayers();
+  for (const r of w.risks) { const a = s.vessels.find(v => v.mmsi === r.a), b = s.vessels.find(v => v.mmsi === r.b);
+    if (a && b) L.polyline([[a.lat, a.lon], [b.lat, b.lon]], {color: "#ffb020", weight: 3, dashArray: "6 5"})
+      .bindTooltip(`CPA ${r.cpa_nm} nm in ${r.tcpa_min} min`).addTo(riskLayer); }
+  const show = $("#covToggle").checked;
+  if (show && !map.hasLayer(covLayer)) covLayer.addTo(map); if (!show && map.hasLayer(covLayer)) map.removeLayer(covLayer);
+  const cs = show ? String(w.coverage.cells.length) : "";
+  if (show && cs !== covSig) { covSig = cs; covLayer.clearLayers(); const mx = Math.max(1, ...w.coverage.cells.map(c => c[1]));
+    for (const [k, n] of w.coverage.cells) { const [la, lo] = k.split(",").map(Number);
+      L.rectangle([[la, lo], [la + .05, lo + .05]], {stroke: false, fillColor: "#33d6ff", fillOpacity: .12 + .5 * Math.log(1 + n) / Math.log(1 + mx)}).addTo(covLayer); } }
+}
+function drawRadar(s, el = "#radar") {
+  const R = Math.max(10, ...s.vessels.map(v => v.range_nm || 0)) * 1.1;
+  let g = [10, 25, 50, 100].filter(r => r < R * 1.2).map(r => `<circle r="${100 * r / R}" fill="none" style="stroke:var(--line)" stroke-width="1.2" stroke-dasharray="2 3"/><text x="${100 * r / R + 2}" y="-2" style="fill:var(--dim)" font-size="5">${r} nm</text>`).join("");
+  g += `<line x1="-100" y1="0" x2="100" y2="0" style="stroke:var(--row)"/><line x1="0" y1="-100" x2="0" y2="100" style="stroke:var(--row)"/><path d="M0-3 2.6 2-2.6 2Z" fill="#2ee6a6"/>`;
+  for (const v of s.vessels) if (v.range_nm != null) {
+    const a = (v.bearing - 90) * Math.PI / 180, r = 100 * v.range_nm / R, em = v.emergency?.level === "crit";
+    g += `<g transform="translate(${r * Math.cos(a)},${r * Math.sin(a)})" onclick="select(${v.mmsi})" style="cursor:pointer">
+      ${em ? `<circle r="5" fill="none" stroke="#ff3b4e" stroke-width="1.2" class="pulse"/>` : ""}<circle r="${em ? 3.2 : 2.4}" fill="${color(v)}"/>
+      <text x="4" y="1.5" style="fill:${em ? "var(--bad)" : "var(--ink)"}" font-size="4.5">${esc(v.name || v.mmsi)}</text></g>`;
+  }
+  $(el).innerHTML = g + `<text x="-106" y="-102" style="fill:var(--dim)" font-size="5">Offline view: range & bearing from station (chart tiles need internet)</text>`;
+}
+function select(mmsi) { selected = mmsi; if (tab !== "watch") $('#tabs [data-t="watch"]').click(); render(last);
+  const v = last.vessels.find(x => x.mmsi === mmsi); if (map && v && v.lat != null) map.setView([v.lat, v.lon], Math.max(map.getZoom(), 11)); }
+window.select = select;
+
+/* ---------------- render ---------------- */
+function render(s) {
+  if (!s) return;
+  const st = s.station;
+  $("#stationLine").textContent = `${st.name || ""} ${st.callsign || ""} · ${st.grid || ""} · RECEIVE-ONLY`;
+  $("#sVessels").textContent = s.vessels.length; $("#sRate").textContent = s.stats.per_min;
+  $("#sRange").textContent = s.stats.max_range_nm ? s.stats.max_range_nm + " nm" : "–";
+  $("#sUtc").textContent = utc(s.time);
+  $("#demoTag").innerHTML = s.demo ? `<span class="pill" style="background:#5a8cff;color:#fff">DEMO · SIMULATED</span>` : "";
+
+  // alarm
+  const open = s.alerts.filter(a => !a.acked), top = open.find(a => a.level === "crit") || open.find(a => a.level === "warn");
+  $("#flash").className = s.alarm || "";
+  $("#alarmbar").className = s.alarm ? "on" + (s.alarm === "warn" ? " warn" : "") : "";
+  $("#alarmtext").textContent = top ? `⚠ ${top.level === "crit" ? "EMERGENCY" : "WARNING"}: ${top.title}` + (open.length > 1 ? `  (+${open.length - 1} more)` : "") : "";
+  const ec = open.filter(a => a.level !== "info").length; $("#emCount").hidden = !ec; $("#emCount").textContent = ec;
+  document.title = s.alarm === "crit" ? "🔴 EMERGENCY · Ocean City Watch" : s.alarm === "warn" ? "🟠 Ocean City Watch" : "Ocean City Watch";
+  for (const a of s.alerts) { const k = a.key + a.level; if (seen.has(k)) continue; seen.add(k);
+    if (!firstLoad && !a.acked && a.level !== "info") { if (a.level === "warn") beep(); notify(a); } }
+  firstLoad = false;
+  if (s.alarm === "crit" && actx && Date.now() - lastSiren > 4000) { lastSiren = Date.now(); siren(); }
+
+  if (tab === "watch") renderWatch(s);
+  if (tab === "emerg") renderEmerg(s);
+  if (tab === "rec") renderRec(s);
+  if (tab === "dsc") renderDsc(s);
+  if (tab === "traffic") renderTraffic(s);
+  if (tab === "cov") renderCov(s);
+  if (tab === "ann") renderAnn(s);
+  if (tab === "sys") renderSys(s);
+  if (tab === "hf") renderHf(s);
+  if (tab === "air") renderAir(s);
+  if (tab === "tl") renderTl(s);
+  if (tab === "console") renderConsole(s);
+}
+const meter = (db, th) => { const p = x => Math.max(0, Math.min(100, (x + 60) / 60 * 100)); return `<div class="meter"><i style="width:${p(db)}%"></i>${th != null ? `<u style="left:${p(th)}%"></u>` : ""}</div>`; };
+
+function renderWatch(s) {
+  $("#rxs").innerHTML = s.receivers.map(r => { const live = r.last_frame && Date.now() / 1000 - r.last_frame < 120;
+    return `<div class="rx"><div class="top"><div><span class="led ${r.cat_ok ? (live ? "on" : "") : "err"}"></span><b>${esc(r.name)}</b>
+      <span class="small"> · ${r.channel === "A" ? "AIS 1 (87B)" : "AIS 2 (88B)"} ${r.mhz.toFixed(3)} MHz</span></div>
+      <div class="seg">${["A", "B", "SCAN"].map(m => `<button class="${r.mode === m ? "on" : ""}" onclick="api('/api/channel',{rx:${esc(JSON.stringify(r.name))},mode:'${m}'})">${m === "SCAN" ? "Scan" : m}</button>`).join("")}</div></div>
+      ${meter(r.level_db)}<div class="small">Audio ${r.level_db} dBFS · ${r.frames} decoded · last ${ago(r.last_frame)} ago · ${esc(r.rig.toUpperCase())}: ${esc(r.rig_status)}</div></div>`; }).join("")
+    + (s.inputs.length ? `<div class="small">Also receiving NMEA from: ${s.inputs.map(esc).join(", ")}</div>` : "");
+  $("#outs").textContent = `NMEA out → UDP ${s.outputs.udp.join(", ") || "off"} · TCP ${s.outputs.tcp || "off"}`;
+  const q = $("#q").value.trim().toLowerCase();
+  const rows = s.vessels.filter(v => !q || `${v.name || ""} ${v.mmsi} ${v.callsign || ""}`.toLowerCase().includes(q));
+  $("#list").innerHTML = rows.map(v => `<tr class="click ${v.mmsi === selected ? "sel" : ""} ${v.emergency?.level === "crit" ? "em" : ""}" onclick="select(${v.mmsi})">
+    <td><span class="dotc" style="background:${color(v)}"></span>${esc(v.name || v.mmsi)}</td><td>${esc(v.emergency?.kind || v.shiptype_name || v.aid_type || v.cls || "")}</td>
+    <td>${v.sog ?? ""}</td><td>${v.range_nm != null ? v.range_nm + " nm" : ""}</td><td>${ago(v.last)}</td></tr>`).join("") ||
+    `<tr><td colspan="5" class="small">No vessels yet. Check the audio meter moves when the channel is busy.</td></tr>`;
+  const v = s.vessels.find(x => x.mmsi === selected);
+  $("#detail").innerHTML = v ? `<dl class="kv">${[
+      ["⚠", v.emergency ? v.emergency.kind : null], ["Name", v.name], ["MMSI", v.mmsi], ["Call sign", v.callsign], ["IMO", v.imo], ["Class", v.cls],
+      ["Type", v.shiptype_name || v.aid_type], ["Status", v.status], ["Position", v.lat != null ? `${v.lat.toFixed(5)}, ${v.lon.toFixed(5)}` : null],
+      ["Speed / course", v.sog != null ? `${v.sog} kn / ${v.cog ?? "–"}°` : null], ["Heading", v.heading != null ? v.heading + "°" : null],
+      ["Altitude", v.altitude_m != null ? v.altitude_m + " m" : null], ["Range / bearing", v.range_nm != null ? `${v.range_nm} nm / ${v.bearing}°` : null],
+      ["Destination", v.destination], ["ETA", v.eta], ["Size", v.length ? `${v.length} × ${v.beam || "?"} m, draught ${v.draught ?? "?"} m` : null],
+      ["Safety text", v.safety_text], ["Heard via", (v.sources || []).join(", ") + ` · ch ${v.channel}`], ["Messages", v.count], ["Last heard", ago(v.last) + " ago"]]
+    .filter(([, x]) => x != null && x !== "").map(([k, x]) => `<dt>${k}</dt><dd>${esc(x)}</dd>`).join("")}</dl>` : "Click a ship on the chart or in the list.";
+  $("#log").textContent = s.log.slice().reverse().map(l => `${utc(l.t)} ${l.nmea}`).join("\n");
+  if (map) drawMap(s); else drawRadar(s);
+}
+
+function renderEmerg(s) {
+  const open = s.alerts.filter(a => !a.acked);
+  $("#alertCount").innerHTML = open.length ? `<span class="pill p-${open.some(a => a.level === "crit") ? "crit" : "warn"}">${open.length} OPEN</span>` : `<span class="pill p-ok">ALL CLEAR</span>`;
+  $("#alerts").innerHTML = s.alerts.length ? s.alerts.map(a => `<div class="alert ${a.acked ? "acked" : ""}">
+    <span class="pill p-${a.level}">${a.level === "crit" ? "EMERGENCY" : a.level === "warn" ? "WARNING" : "INFO"}</span>
+    <div><b>${esc(a.title)}</b>${a.count > 1 ? ` <span class="pill p-info">×${a.count}</span>` : ""}<p>${esc(a.detail)}</p>
+      <p>${utc(a.first, 1)}${a.acked ? " · acknowledged by " + esc(a.acked_by) : ""}
+      ${a.mmsi ? ` · <a href="#" onclick="select(${a.mmsi});return false" style="color:var(--a)">show on chart</a>` : ""}
+      ${a.incident ? ` · <a href="/files/incidents/${encodeURIComponent(a.incident)}/report.html" target="_blank" style="color:var(--a)">incident report</a>` : ""}</p></div>
+    <div>${a.acked ? "" : `<button data-ack="${esc(a.key)}">Ack</button>`}</div></div>`).join("") : `<div class="small">No alerts.</div>`;
+  $("#incidents").innerHTML = s.incidents.length ? `<table><thead><tr><th>Opened (UTC)</th><th>Kind</th><th>MMSI / name</th><th>Rec.</th><th></th></tr></thead><tbody>${
+    s.incidents.map(i => `<tr class="${i.active && i.level === "crit" ? "em" : ""}"><td>${utc(i.opened, 1)}</td><td>${esc(i.kind)}${i.active ? ' <span class="pill p-crit">ACTIVE</span>' : ""}</td>
+      <td>${i.mmsi} ${esc(i.name || "")}</td><td>${i.recordings}</td><td><a href="/files/incidents/${encodeURIComponent(i.id)}/report.html" target="_blank" style="color:var(--a)">Open report</a></td></tr>`).join("")}</tbody></table>`
+    : `<div class="small">No incidents recorded.</div>`;
+}
+
+function renderRec(s) {
+  $("#recorders").innerHTML = s.recorders.length ? s.recorders.map(r => `<div class="rx"><div class="top"><div><span class="led ${r.error ? "err" : r.recording ? "rec" : "on"}"></span><b>${esc(r.name)}</b>
+      <span class="small">${r.error ? esc(r.error) : r.recording ? " · RECORDING" + (r.manual ? " (manual)" : "") : " · listening"}</span></div>
+      <div class="seg"><button onclick="api('/api/record',{name:${esc(JSON.stringify(r.name))},minutes:10})">Record 10 min</button></div></div>
+      ${meter(r.level_db, r.threshold_db)}<div class="small">Level ${r.level_db} dBFS (starts at ${r.threshold_db}) · ${r.count} clips this session${r.last_file ? " · last " + esc(r.last_file) : ""}</div></div>`).join("")
+    : `<div class="small">No recorders configured yet.</div>`;
+  $("#recs").innerHTML = s.recordings.length ? s.recordings.map(r => `<tr><td>${utc(r.time, 1)}</td><td>${esc(r.source)}</td><td>${r.seconds ?? "?"} s</td>
+    <td><audio controls preload="none" src="/files/recordings/${r.path.split("/").map(encodeURIComponent).join("/")}"></audio></td></tr>`).join("")
+    : `<tr><td colspan="4" class="small">No recordings yet.</td></tr>`;
+}
+
+function renderDsc(s) {
+  const d = s.dsc;
+  $("#dscRx").innerHTML = d.receivers.length ? d.receivers.map(r => `<div class="rx"><b>${esc(r.name)}</b>${meter(r.level_db)}
+    <div class="small">Audio ${r.level_db} dBFS · ${r.calls} calls decoded · last ${ago(r.last_call)} ago · ${esc(r.rig_status)}</div></div>`).join("")
+    : `<div class="small">No DSC receiver set up. Add one under <code>dsc_receivers</code> in config.json (any receiver tuned to Ch70, audio into the computer).</div>`;
+  $("#dscLog").innerHTML = d.log.length ? d.log.map(m => `<tr class="${m.level === "crit" ? "em" : ""}"><td>${utc(m.t, 1)}</td>
+    <td><span class="pill p-${m.level}">${esc(m.format)}</span> ${esc(m.category || "")}</td><td>${m.mmsi ?? "?"}</td>
+    <td>${esc(m.distress_mmsi || m.address || m.area || "all ships")}</td>
+    <td>${esc([m.nature, m.lat != null ? `${m.lat}, ${m.lon}` : null, m.time, m.telecommand1, m.channel ? "ch " + m.channel : null, m.subsequent].filter(Boolean).join(" · "))}</td>
+    <td>${m.ecc_ok === true ? "✓" : m.ecc_ok === false ? "⚠ ECC" : "–"}${m.errors ? ` (${m.errors} lost)` : ""}</td></tr>`).join("")
+    : `<tr><td colspan="6" class="small">No DSC calls heard yet.</td></tr>`;
+}
+
+function renderTraffic(s) {
+  const w = s.watch, nm = id => { const v = s.vessels.find(x => x.mmsi === id); return esc(v?.name || id); };
+  $("#risks").innerHTML = w.risks.length ? `<table><tr><th>Vessels</th><th>CPA</th><th>In</th></tr>${w.risks.map(r =>
+    `<tr class="click em" onclick="select(${r.a})"><td>${esc(r.names)}</td><td>${r.cpa_nm} nm</td><td>${r.tcpa_min} min</td></tr>`).join("")}</table>` : `<div class="small">No collision risks right now.</div>`;
+  $("#dark").innerHTML = w.dark.length ? `<table><tr><th>Vessel</th><th>Silent for</th><th>Last position</th></tr>${w.dark.map(d =>
+    `<tr><td>${esc(d.name || d.mmsi)}</td><td>${ago(d.since)}</td><td>${d.lat.toFixed(4)}, ${d.lon.toFixed(4)}</td></tr>`).join("")}</table>` : `<div class="small">No unexpected AIS gaps.</div>`;
+  $("#anchors").innerHTML = w.anchors.length ? `<table><tr><th>Vessel</th><th>Anchored</th><th>Max movement</th></tr>${w.anchors.map(a =>
+    `<tr class="click ${a.max_m > 150 ? "em" : ""}" onclick="select(${a.mmsi})"><td>${esc(a.name || a.mmsi)}</td><td>${ago(a.since)}</td><td>${a.max_m} m</td></tr>`).join("")}</table>` : `<div class="small">No vessels at anchor.</div>`;
+  const ch = s.channels, f = c => ch[c] != null && ch[c] < 600 ? `<span class="pill p-ok">heard ${ch[c]}s ago</span>` : `<span class="pill p-warn">not heard</span>`;
+  $("#chans").innerHTML = `<div>AIS 1 (161.975): ${f("A")}</div><div style="margin-top:4px">AIS 2 (162.025): ${f("B")}</div>
+    <p class="small">Ships alternate between both channels. For full coverage, run a second receiver on the other channel, or an RTL-SDR decoding both into <code>nmea_in_udp</code>.</p>`;
+  $("#zones").innerHTML = w.zones.length ? `<table>${w.zones.map(z => `<tr><td><span class="dotc" style="background:${ZCOL[z.type]}"></span>${esc(z.name)}</td><td>${esc(z.type)}</td>
+    <td>${z.radius_nm ? z.radius_nm + " nm" : "polygon"}</td><td><button class="danger" onclick="api('/api/zone/remove',{name:${esc(JSON.stringify(z.name))}})">✕</button></td></tr>`).join("")}</table>` : `<div class="small">No zones yet.</div>`;
+  $("#wlist").innerHTML = Object.keys(w.watchlist).length ? `<table>${Object.entries(w.watchlist).map(([m, e]) => {
+    const v = s.vessels.find(x => x.mmsi === +m);
+    return `<tr><td>${esc(e.label)}</td><td>${m}</td><td>${v ? `<span class="pill p-ok">in range ${v.range_nm ?? ""} nm</span>` : '<span class="pill p-info">not heard</span>'}</td>
+      <td><span class="pill p-${e.level}">${e.level}</span></td><td><button class="danger" onclick="api('/api/watchlist/remove',{mmsi:${+m}})">✕</button></td></tr>`; }).join("")}</table>` : `<div class="small">Watchlist is empty.</div>`;
+}
+
+function renderCov(s) {
+  const sec = s.watch.coverage.sectors, R = Math.max(10, ...sec) * 1.1;
+  let g = [10, 25, 50, 100].filter(r => r < R * 1.2).map(r => `<circle r="${100 * r / R}" fill="none" stroke="#1f4a3a" stroke-dasharray="2 3"/><text x="2" y="${-100 * r / R - 2}" fill="#3f7a64" font-size="6">${r} nm</text>`).join("");
+  const pts = sec.map((d, i) => { const a = (i * 10 + 5 - 90) * Math.PI / 180, r = 100 * d / R; return `${(r * Math.cos(a)).toFixed(1)},${(r * Math.sin(a)).toFixed(1)}`; });
+  g += `<polygon points="${pts.join(" ")}" fill="#33d6ff33" stroke="#33d6ff" stroke-width="1"/>`;
+  ["N", "E", "S", "W"].forEach((t, i) => { const a = (i * 90 - 90) * Math.PI / 180; g += `<text x="${108 * Math.cos(a) - 3}" y="${108 * Math.sin(a) + 3}" fill="#7f97ad" font-size="8">${t}</text>`; });
+  $("#polar").innerHTML = g + `<path d="M0-3 2.6 2-2.6 2Z" fill="#2ee6a6"/>`;
+  const best = sec.map((d, i) => [d, i * 10]).sort((a, b) => b[0] - a[0])[0];
+  $("#covInfo").innerHTML = `Best range so far: <b style="color:var(--ink)">${best[0]} nm</b> toward ${best[1]}–${best[1] + 10}°. Weak sectors show where hills,
+    buildings or the antenna's position block reception, which helps when choosing antenna height and placement.
+    ${s.watch.coverage.cells.length} chart squares have heard ships. Coverage is saved in data/coverage.json and builds up over days.`;
+}
+
+let annRendered = "";
+function renderAnn(s) {
+  const a = s.announcements, sc = a.script || {};
+  $("#ident").innerHTML = sc.error ? `<dt>!</dt><dd>${esc(sc.error)}</dd>` : [["Call sign", s.station.callsign], ["Position", `${sc.lat_dm} ${sc.lon_dm}`],
+    ["Decimal", `${(+sc.lat).toFixed(5)}, ${(+sc.lon).toFixed(5)}`], ["Grid square", sc.grid]].map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
+  $("#script").textContent = sc.text || "";
+  const c = s.composer;
+  if (!$("#cKind").options.length) $("#cKind").innerHTML = Object.entries(c.templates).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("");
+  $("#cAi").disabled = !c.ai; $("#cAi").title = c.ai ? "" : "Add an Anthropic API key under \"ai\" in config.json to enable";
+  if (!annSel && a.files.length) annSel = a.files[0].name;
+  const sig = JSON.stringify([a.files, a.playing, annSel]);
+  if (sig !== annRendered) { annRendered = sig;
+    $("#annList").innerHTML = a.files.length ? `<table><tbody>${a.files.map(f => `<tr class="click ${f.name === annSel ? "sel" : ""}" onclick="annSel=${esc(JSON.stringify(f.name))};render(last)">
+      <td><input type="radio" name="annsel" ${f.name === annSel ? "checked" : ""}> ${esc(f.name)}</td><td>${f.seconds ?? "?"} s</td>
+      <td><audio controls preload="none" src="/files/announcements/${encodeURIComponent(f.name)}" onclick="event.stopPropagation()"></audio></td>
+      <td><button class="danger" data-del="${esc(f.name)}">✕</button></td></tr>`).join("")}</tbody></table>` : `<div class="small">No audio yet. Make one with the composer or record your voice.</div>`; }
+  $("#ptp").disabled = !annSel || !!a.playing;
+  $("#ptp").textContent = a.playing ? "■ PLAYING…" : annSel ? `▶ PRESS TO PLAY: ${annSel}` : "▶ PRESS TO PLAY";
+  $("#annOut").innerHTML = (a.playing ? `<b style="color:var(--warn)">Playing ${esc(a.playing)} to ${esc(a.output_device ?? "default output")}</b> <button onclick="api('/api/announce/stop')">Stop</button> · ` : "")
+    + `Output: ${esc(a.output_device ?? "default sound output")}${a.last_played ? " · last played " + esc(a.last_played) : ""}`
+    + (a.reminders.length ? ` · broadcast reminders at ${a.reminders.map(esc).join(", ")}` : "");
+}
+
+function renderSys(s) {
+  const st = s.station;
+  $("#sysStation").innerHTML = [["Name", st.name], ["Call sign", st.callsign], ["Position", st.lat != null ? `${st.lat}, ${st.lon}` : "not set"], ["Grid", st.grid],
+    ["Uptime", `${Math.floor(s.stats.uptime / 3600)}h ${Math.floor(s.stats.uptime / 60) % 60}m`], ["Messages", s.stats.messages]].map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
+  const n = s.notify;
+  $("#notify").innerHTML = n.channels.length ? n.channels.map(c => `<div><b style="color:var(--ink)">${esc(c)}</b> — ${esc(n.status[c] || "ready")}</div>`).join("")
+    : "No forwarding set up. Add email, Telegram, WhatsApp or a webhook under <code>notify</code> in config.json.";
+  const names = {1: "Position A", 2: "Position A", 3: "Position A", 4: "Base station", 5: "Static/voyage", 9: "SAR aircraft", 12: "Safety (addressed)", 14: "Safety broadcast", 18: "Position B", 19: "Position B ext.", 21: "Aid to navigation", 24: "Static B", 27: "Long-range"};
+  $("#share").innerHTML = s.share.targets.length ? `Sharing your AIS reception with ${s.share.targets.map(esc).join(", ")} ·
+    ${s.share.active ? s.share.sent + " sentences sent" : "inactive in demo mode"}` :
+    "Not sharing. Add AISHub, MarineTraffic or another network under <code>share</code> in config.json (they give you a host and port). Many networks give free wider-area data in return.";
+  $("#byType").innerHTML = Object.entries(s.stats.by_type).map(([t, c]) => `Type ${t} ${names[t] ? "(" + names[t] + ")" : ""}: <b style="color:var(--ink)">${c}</b>`).join("<br>") || "No messages yet.";
+}
+
+/* ---------------- actions ---------------- */
+document.addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.ack) api("/api/ack", {key: b.dataset.ack});
+  if (b.dataset.del && confirm("Delete " + b.dataset.del + "?")) api("/api/announce/delete", {name: b.dataset.del});
+});
+$("#ackAll").onclick = $("#alarmAck").onclick = () => api("/api/ack", {});
+$("#snapBtn").onclick = async () => { const j = await api("/api/snapshot", {}); if (j.id) { $("#snapResult").innerHTML =
+  `Snapshot saved: <a href="/files/snapshots/${j.id}/snapshot.html" target="_blank" style="color:var(--a)">${j.id}</a>`; window.open(`/files/snapshots/${j.id}/snapshot.html`, "_blank"); } };
+$("#testNotify").onclick = () => api("/api/notify/test", {});
+
+/* traffic watch forms */
+$("#zAdd").onclick = () => api("/api/zone/add", {name: $("#zName").value, type: $("#zType").value, lat: +$("#zLat").value, lon: +$("#zLon").value, radius_nm: +$("#zRad").value});
+$("#wAdd").onclick = () => api("/api/watchlist/add", {mmsi: +$("#wMmsi").value, label: $("#wLabel").value, note: $("#wNote").value, level: $("#wLevel").value});
+$("#covToggle").onchange = () => { covSig = ""; render(last); };
+
+/* composer → text-to-speech → Press To Play */
+const cFields = () => ({title: $("#cTitle").value, text: $("#cNotes").value, lat: $("#cLat").value, lon: $("#cLon").value, channel: $("#cChan").value, incident: last?.composer?.incident});
+$("#cFill").onclick = async () => { const j = await api("/api/compose", {kind: $("#cKind").value, fields: cFields()}); if (j.text) $("#cText").value = j.text; };
+$("#cAi").onclick = async () => { $("#cState").textContent = "AI is drafting…";
+  const j = await api("/api/ai_draft", {kind: $("#cKind").value, notes: $("#cNotes").value, fields: cFields(), use_incident: $("#cUseInc").checked, incident: last?.composer?.incident});
+  $("#cState").textContent = j.text ? "AI draft ready: check every detail before use" : ""; if (j.text) $("#cText").value = j.text; };
+$("#cTts").onclick = async () => { if (!$("#cText").value.trim()) return alert("Write or generate a script first.");
+  $("#cState").textContent = "Making audio…"; const j = await api("/api/announce/tts", {text: $("#cText").value, name: $("#cName").value || "broadcast"});
+  $("#cState").textContent = j.name ? "Saved " + j.name + ". Select it below and Press To Play." : ""; if (j.name) { annSel = j.name; annRendered = ""; } };
+$("#ptp").onclick = () => { if (!annSel) return; document.querySelectorAll(".ptpc").forEach(x => x.checked = false); $("#ptpGo").disabled = true;
+  $("#ptpFile").textContent = "Audio: " + annSel + " → " + (last?.announcements?.output_device ?? "default sound output"); $("#ptpModal").style.display = "flex"; };
+document.querySelectorAll(".ptpc").forEach(x => x.onchange = () => $("#ptpGo").disabled = ![...document.querySelectorAll(".ptpc")].every(c => c.checked));
+$("#ptpCancel").onclick = () => $("#ptpModal").style.display = "none";
+$("#ptpGo").onclick = () => { $("#ptpModal").style.display = "none"; api("/api/announce/play", {name: annSel}); };
+$("#copyScript").onclick = () => navigator.clipboard?.writeText($("#script").textContent);
+$("#ttsBtn").onclick = () => api("/api/announce/tts", {text: $("#script").textContent, name: "station-id-tts"});
+$("#q").oninput = () => render(last);
+
+/* microphone recording → WAV upload */
+let mic = null;
+$("#micBtn").onclick = async () => {
+  if (mic) { mic.stop(); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: false, noiseSuppression: false, autoGainControl: false}});
+    const ctx = new AudioContext(), src = ctx.createMediaStreamSource(stream), proc = ctx.createScriptProcessor(4096, 1, 1), chunks = [];
+    proc.onaudioprocess = e => chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+    src.connect(proc); proc.connect(ctx.destination);
+    const t0 = Date.now(); const timer = setInterval(() => $("#micState").textContent = `recording ${Math.round((Date.now() - t0) / 1000)} s…`, 300);
+    $("#micBtn").textContent = "■ Stop";
+    mic = {stop: async () => {
+      clearInterval(timer); proc.disconnect(); src.disconnect(); stream.getTracks().forEach(t => t.stop());
+      const n = chunks.reduce((a, c) => a + c.length, 0), fs = ctx.sampleRate, buf = new ArrayBuffer(44 + n * 2), dv = new DataView(buf);
+      const w = (o, s) => [...s].forEach((c, i) => dv.setUint8(o + i, c.charCodeAt(0)));
+      w(0, "RIFF"); dv.setUint32(4, 36 + n * 2, true); w(8, "WAVE"); w(12, "fmt "); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+      dv.setUint32(24, fs, true); dv.setUint32(28, fs * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true); w(36, "data"); dv.setUint32(40, n * 2, true);
+      let o = 44; for (const c of chunks) for (const x of c) { dv.setInt16(o, Math.max(-1, Math.min(1, x)) * 32767, true); o += 2; }
+      ctx.close(); mic = null; $("#micBtn").textContent = "● Record"; $("#micState").textContent = "saving…";
+      const j = await api("/api/announce/upload", null, buf, {"X-Name": encodeURIComponent($("#recName").value || "announcement")});
+      $("#micState").textContent = j.name ? "saved " + j.name : ""; annRendered = ""; }};
+  } catch (e) { alert("Microphone not available: " + e.message); }
+};
+
+
+/* ---------------- HF radio ---------------- */
+let hfCat = null, hfCatRx = null, wfIdx = 0, wfTimer = null, hfName = "";
+const hfCur = s => (s.hf || []).find(h => h.name === hfName) || (s.hf || [])[0];
+const WF = (() => { const p = []; for (let i = 0; i < 256; i++) { const t = i / 255;
+  p.push([Math.round(255 * Math.min(1, Math.max(0, 1.6 * t - .6))), Math.round(255 * Math.min(1, Math.max(0, 2 * t - .25))), Math.round(255 * Math.min(1, .25 + 1.6 * t * (1 - t) * 2))]); } return p; })();
+const WF_NIGHT = (() => { const p = []; for (let i = 0; i < 256; i++) { const t = i / 255; p.push([Math.round(30 + 225 * t), Math.round(40 * t * t), 0]); } return p; })();
+const WF_GOLD = (() => { const p = []; for (let i = 0; i < 256; i++) { const t = i / 255;
+  p.push([Math.round(255 * Math.min(1, 1.4 * t)), Math.round(255 * Math.min(1, Math.max(0, 1.5 * t - .15)) * .85), Math.round(90 * (1 - t) + 60 * t * t)]); } return p; })();
+let wfHist = [];
+function wfRepaint() { const h = wfHist.slice(); wfHist = []; for (const id of ["wf", "wf2"]) { const c = $("#" + id); c.getContext("2d").clearRect(0, 0, c.width, c.height); } wfDraw(h); }
+function wfDraw(rows) {
+  if (!rows.length) return;
+  wfHist = wfHist.concat(rows).slice(-240);
+  const face = document.documentElement.dataset.face, pal = face === "night" ? WF_NIGHT : face === "gold" ? WF_GOLD : WF;
+  for (const id of ["wf", "wf2"]) {
+    const c = $("#" + id), g = c.getContext("2d");
+    const n = Math.min(rows.length, c.height);
+    g.drawImage(c, 0, n);  // scroll down
+    const img = g.createImageData(c.width, n);
+    rows.slice(-n).reverse().forEach(([, row], y) => row.forEach((v, x) => { const k = (y * c.width + x) * 4, col = pal[v];
+      img.data[k] = col[0]; img.data[k + 1] = col[1]; img.data[k + 2] = col[2]; img.data[k + 3] = 255; }));
+    g.putImageData(img, 0, 0);
+  }
+}
+async function wfPoll() {
+  if ((tab !== "hf" && tab !== "console") || !hfName) return;
+  try { const rows = await (await fetch(`/api/hf/waterfall?rx=${encodeURIComponent(hfName)}&since=${wfIdx}`, {cache: "no-store"})).json();
+    if (rows.length) { wfIdx = rows[rows.length - 1][0]; wfDraw(rows); } } catch (e) {}
+}
+setInterval(wfPoll, 600);
+async function hfLoadCat() {
+  hfCat = await (await fetch(`/api/hf/catalog?rx=${encodeURIComponent(hfName)}`)).json(); hfCatRx = hfName;
+  const groups = [...new Set(hfCat.channels.map(c => c.group))];
+  $("#hfGroup").innerHTML = groups.map(g => `<option>${esc(g)}</option>`).join("");
+  $("#hfList").innerHTML = $("#cList").innerHTML = Object.keys(hfCat.lists).map(l => `<option>${esc(l)}</option>`).join("");
+  hfFillCh();
+}
+function hfFillCh() { const g = $("#hfGroup").value;
+  $("#hfCh").innerHTML = hfCat.channels.filter(c => c.group === g).map(c => `<option value="${esc(c.id)}">${esc(c.label)}${c.dial_khz !== c.khz ? ` (dial ${c.dial_khz})` : ""}</option>`).join(""); }
+$("#hfGroup").onchange = hfFillCh;
+$("#hfRx").onchange = () => { hfName = $("#hfRx").value; wfIdx = 0; hfLoadCat(); };
+const hfApi = (path, body) => api(path, {rx: hfName, ...body});
+$("#hfTune").onclick = () => { const k = parseFloat($("#hfKhz").value); if (!k) return alert("Type a frequency in kHz");
+  hfApi("/api/hf/tune", {khz: k, mode: $("#hfMode").value, offset_khz: parseFloat($("#hfOff").value) || 0}); };
+$("#hfKhz").onkeydown = e => { if (e.key === "Enter") $("#hfTune").click(); };
+const step = d => { const h = hfCur(last); if (h) hfApi("/api/hf/tune", {khz: h.dial_khz + d, mode: h.mode}); };
+$("#hfUp").onclick = () => step(1); $("#hfDn").onclick = () => step(-1);
+$("#hfGo").onclick = () => hfApi("/api/hf/tune", {channel: $("#hfCh").value});
+$("#hfScan").onclick = () => hfApi("/api/hf/scan", {list: $("#hfList").value});
+$("#hfStop").onclick = () => hfApi("/api/hf/scan", {stop: true});
+[["dNr", "nr"], ["dNotch", "notch"], ["dAgc", "agc"], ["dMute", "mute"]].forEach(([id, k]) => $("#" + id).onchange = e => hfApi("/api/hf/dsp", {[k]: e.target.checked}));
+$("#dStr").onchange = e => hfApi("/api/hf/dsp", {nr_strength: +e.target.value});
+$("#dVol").onchange = e => hfApi("/api/hf/dsp", {volume: +e.target.value});
+const setIf = (id, prop, v) => { const el = $("#" + id); if (document.activeElement !== el) el[prop] = v; };
+function renderHf(s) {
+  const hfs = s.hf || [];
+  if (!hfs.length) { $("#hfLcd").innerHTML = "– – –"; $("#hfRig").innerHTML = 'No HF receiver set up. Add one under <code>hf_receivers</code> in config.json.'; return; }
+  if (!hfName || !hfs.some(h => h.name === hfName)) { hfName = hfs[0].name; }
+  const names = hfs.map(h => h.name).join("|");
+  if ($("#hfRx").dataset.n !== names) { $("#hfRx").dataset.n = names; $("#hfRx").innerHTML = hfs.map(h => `<option>${esc(h.name)}</option>`).join(""); }
+  $("#hfRx").value = hfName;
+  if (hfCatRx !== hfName) hfLoadCat();
+  const h = hfCur(s);
+  $("#hfLcd").innerHTML = `${h.dial_khz.toFixed(1)} <small>kHz ${esc(h.mode)}</small>`;
+  $("#hfChan").textContent = h.channel ? `${h.channel.group} · ${h.channel.label}` : "Manual frequency";
+  $("#hfRig").textContent = `${h.model ? h.model + " · " : ""}${h.rig_status}`;
+  $("#hfVoice").className = "led" + (h.voice ? " on" : ""); $("#hfRec").className = "led" + (h.recording ? " rec" : "");
+  $("#hfScanTag").innerHTML = h.scan ? `<span class="pill p-info">SCANNING ${esc(h.scan)}${h.holding ? " · HOLD" : ""}</span>` : "";
+  $("#hfSnr").textContent = h.snr_db; $("#hfLvl").textContent = h.level_db;
+  $("#hfSnrBar").style.width = Math.min(100, h.snr_db * 4) + "%";
+  $("#hfNotch").innerHTML = h.notched_hz.length ? `· notched ${h.notched_hz.map(f => `<span class="chip">${f} Hz</span>`).join("")}` : "";
+  setIf("dNr", "checked", h.nr); setIf("dNotch", "checked", h.notch); setIf("dAgc", "checked", h.agc); setIf("dStr", "value", h.nr_strength);
+  $("#spkRow").style.display = h.speaker ? "" : "none";
+  if (h.speaker) { setIf("dVol", "value", h.volume); setIf("dMute", "checked", h.muted); }
+  $("#selN").textContent = `${h.selcal_calls} decoded`;
+  $("#selLog").innerHTML = h.selcal.length ? h.selcal.map(c => `<tr class="${c.watch ? "em" : ""}"><td>${utc(c.t, 1)}</td><td><b>${esc(c.code)}</b></td><td>${c.khz}</td>
+    <td>${esc(c.where)}</td><td>${esc(c.watch || "")}</td></tr>`).join("") : `<tr><td colspan="5" class="small">No SELCAL calls yet. Tune an aviation channel.</td></tr>`;
+  $("#hfHeard").innerHTML = h.heard.length ? h.heard.map(x => `<tr class="click" onclick="hfApi('/api/hf/tune',{khz:${x.khz},mode:'USB'})"><td>${utc(x.t, 1)}</td><td>${x.khz}</td><td>${esc(x.label)}</td><td>${x.seconds} s</td></tr>`).join("")
+    : `<tr><td colspan="4" class="small">Nothing heard yet.</td></tr>`;
+}
+window.hfApi = hfApi;
+
+/* ---------------- aviation & data ---------------- */
+function renderAir(s) {
+  const ac = s.aircraft || [];
+  $("#acN").textContent = ac.length + " aircraft";
+  $("#acList").innerHTML = ac.length ? ac.map(a => `<tr><td><b>${esc(a.flight || "")}</b></td><td>${esc(a.reg || a.icao || "")}</td>
+    <td>${a.lat != null ? a.lat.toFixed(2) + ", " + a.lon.toFixed(2) : "–"}</td><td>${esc(a.feed)}${a.freq ? " " + a.freq : ""}</td><td>${a.msgs}</td><td>${ago(a.last)}</td></tr>`).join("")
+    : `<tr><td colspan="6" class="small">No aircraft yet. Needs dumphfdl or JAERO feeding this computer (see setup below).</td></tr>`;
+  const sd = s.sondes || {receivers: [], list: []};
+  $("#sondeRx").innerHTML = sd.receivers.map(r => `<div class="rx"><b>${esc(r.name)}</b>${r.mhz ? ` · ${r.mhz} MHz` : ""}${meter(r.level_db)}
+    <div class="small">${r.error ? esc(r.error) : `${r.frames} frames decoded · ${r.bad} failed · last ${ago(r.last)} ago`}</div></div>`).join("")
+    || `<div class="small">No radiosonde receiver set up (needs an SDR on 400–406 MHz; see README).</div>`;
+  $("#sondeList").innerHTML = sd.list.length ? sd.list.map(x => `<tr><td><b>${esc(x.serial)}</b></td><td>${x.alt} m</td><td>${x.climb} m/s</td><td>${x.speed_kmh} km/h ${x.heading}°</td>
+    <td>${x.lat}, ${x.lon}</td><td>${x.burst ? `<span class="pill p-warn">burst ${x.burst.alt} m</span>` : x.climb > 0 ? "ascending" : "descending"}
+    ${x.landing ? `<div class="small">rough landing ${x.landing.lat}, ${x.landing.lon} in ${x.landing.minutes} min</div>` : ""}</td><td>${ago(Date.now() / 1000 - x.age)}</td></tr>`).join("")
+    : `<tr><td colspan="7" class="small">No radiosondes heard.</td></tr>`;
+  const f = s.feeds || {log: {}, listeners: []}, L = f.log;
+  const st = k => { const l = f.listeners.find(x => x.kind === k); return l ? (l.error ? "⚠ " + l.error : `UDP ${l.port} · ${l.count} msgs · last ${ago(l.last)}`) : "off"; };
+  $("#fHfdl").textContent = st("hfdl"); $("#fInm").textContent = st("inmarsat"); $("#fAcars").textContent = st("acars");
+  $("#hfdlLog").innerHTML = (L.hfdl || []).length ? L.hfdl.map(e => `<tr class="${e.level === "crit" ? "em" : ""}"><td>${utc(e.t)}</td><td>${esc(e.flight || "")} ${esc(e.reg || "")}</td>
+    <td>${e.freq ?? ""}</td><td>${esc(e.station || "")}</td><td title="${esc(e.cpdlc || e.text || "")}">${e.cpdlc ? `<span class="pill p-info">CPDLC</span> ${esc(e.cpdlc)}` : esc(e.text || (e.lat != null ? `position ${e.lat}, ${e.lon}` : e.title || ""))}</td></tr>`).join("")
+    : `<tr><td colspan="5" class="small">No HFDL messages.</td></tr>`;
+  $("#acarsLog").innerHTML = (L.acars || []).length ? L.acars.map(e => `<tr class="${e.level === "crit" ? "em" : ""}"><td>${utc(e.t)}</td><td>${esc(e.flight || "")} ${esc(e.reg || "")}</td>
+    <td>${esc(e.label || "")}</td><td title="${esc(e.text || "")}">${esc(e.text || e.title || "")}</td></tr>`).join("") : `<tr><td colspan="4" class="small">No ACARS messages.</td></tr>`;
+  $("#inmLog").innerHTML = (L.inmarsat || []).length ? L.inmarsat.map(e => `<div class="alert"><span class="pill p-${e.level}">${e.level === "crit" ? "DISTRESS" : e.level === "warn" ? "URGENCY/SAR" : "INFO"}</span>
+    <div><b>${esc((e.text || e.title || "").slice(0, 90))}</b><p style="white-space:pre-wrap">${esc(e.text || "")}</p>${e.station ? `<p>${esc(e.station)}${e.priority ? " · " + esc(e.priority) : ""}</p>` : ""}
+    ${e.ai ? `<p style="color:#9fe0ff">🤖 ${esc(e.ai)}</p>` : ""}</div>
+    <div class="small">${utc(e.t)}<br><button title="Ask AI to explain this message" onclick="api('/api/feed/ai',{kind:'inmarsat',t:${e.t}})">Explain</button></div></div>`).join("")
+    : `<div class="small">No Inmarsat-C messages.</div>`;
+  $("#feedSt").innerHTML = `Listening: ${f.listeners.map(l => `<span class="chip">${esc(l.kind)} UDP ${l.port}${l.error ? " ⚠" : ""}</span>`).join(" ") || "none (enable under <code>feeds</code> in config.json)"}.
+    Point the decoders at this computer: <b>dumphfdl</b> <code>--output decoded:json:udp:address=&lt;this PC&gt;,port=5555</code> ·
+    <b>JAERO</b> UDP/JSON output → port 5556 · <b>Scytale-C</b> UDP output → port 5557.
+    AI explanations of urgent messages: ${f.ai ? "on" : "off (add your Anthropic key under <code>ai</code> in config.json)"}.`;
+}
+
+/* ---------------- timeline ---------------- */
+let tlFilter = "";
+document.querySelectorAll("#tlF button").forEach(b => b.onclick = () => { tlFilter = b.dataset.f;
+  document.querySelectorAll("#tlF button").forEach(x => x.classList.toggle("on", x === b)); render(last); });
+function renderTl(s) {
+  const want = tlFilter ? tlFilter.split(",") : null;
+  const rows = (s.timeline || []).filter(e => !want || want.includes(e.kind));
+  $("#tlBody").innerHTML = rows.length ? rows.map(e => `<tr class="${e.level === "crit" ? "em" : ""}"><td>${utc(e.t, 1)}</td><td><span class="pill p-${e.level}">${esc(e.kind)}</span></td>
+    <td>${esc(e.source)}</td><td style="white-space:normal">${esc(e.text)}${e.file ? ` <audio controls preload="none" src="/files/recordings/${encodeURIComponent(e.file.split("/")[0])}/${encodeURIComponent(e.file.split("/")[1])}"></audio>` : ""}</td></tr>`).join("")
+    : `<tr><td colspan="4" class="small">Nothing yet.</td></tr>`;
+}
+
+
+/* ---------------- faceplates ---------------- */
+const store = {get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } },
+               set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} }};
+let face = store.get("ocw.face") || "ocean", autoNight = store.get("ocw.autoNight") === "1";
+function sunAlt(lat, lon, d = new Date()) {  // solar altitude in degrees (good to a fraction of a degree)
+  const r = Math.PI / 180, n = d / 86400000 + 2440587.5 - 2451545.0;
+  const L = (280.46 + 0.9856474 * n) % 360, g = ((357.528 + 0.9856003 * n) % 360) * r;
+  const lam = (L + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)) * r, eps = (23.439 - 4e-7 * n) * r;
+  const dec = Math.asin(Math.sin(eps) * Math.sin(lam)), ra = Math.atan2(Math.cos(eps) * Math.sin(lam), Math.cos(lam));
+  const ha = ((18.697374558 + 24.06570982441908 * n) % 24 * 15 + lon) * r - ra;
+  return Math.asin(Math.sin(lat * r) * Math.sin(dec) + Math.cos(lat * r) * Math.cos(dec) * Math.cos(ha)) / r;
+}
+function applyFace() {
+  const st = (last && last.station) || {}, lat = st.lat ?? 13.1, lon = st.lon ?? -59.6;
+  const dark = autoNight && sunAlt(lat, lon) < -3;
+  const f = dark ? "night" : face;
+  const before = document.documentElement.dataset.face || "ocean";
+  if (f === "ocean") delete document.documentElement.dataset.face; else document.documentElement.dataset.face = f;
+  if (before !== f && typeof wfRepaint === "function") wfRepaint();
+  $("#autoNight").parentElement.title = autoNight ? (dark ? "Night faceplate on: the sun is down at the station" :
+    "Night faceplate will switch on after sunset at the station") : "Switch to the night faceplate between sunset and sunrise at the station";
+}
+$("#faceSel").value = face; $("#autoNight").checked = autoNight;
+$("#dimmer").value = store.get("ocw.dim") || ".85"; document.documentElement.style.setProperty("--dimmer", $("#dimmer").value);
+$("#faceSel").onchange = e => { face = e.target.value; store.set("ocw.face", face); applyFace(); };
+$("#autoNight").onchange = e => { autoNight = e.target.checked; store.set("ocw.autoNight", autoNight ? "1" : "0"); applyFace(); };
+$("#dimmer").oninput = e => { document.documentElement.style.setProperty("--dimmer", e.target.value); store.set("ocw.dim", e.target.value); };
+applyFace(); setInterval(applyFace, 60000);
+
+/* ---------------- console view ---------------- */
+let cMap = null, cLayer = null, cMk = {};
+function initConsoleMap(st) {
+  if (cMap || typeof L === "undefined") return;
+  cMap = L.map("cMap", {zoomControl: true}).setView([st.lat ?? 13.1, st.lon ?? -59.6], 7);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom: 17,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(cMap);
+  if (st.lat != null) {
+    L.marker([st.lat, st.lon], {icon: L.divIcon({className: "", iconSize: [18, 18], iconAnchor: [9, 9],
+      html: `<svg width="18" height="18" viewBox="-9 -9 18 18"><path d="M0-8 7 6-7 6Z" fill="#2ee6a6" stroke="#012" stroke-width="1.5"/></svg>`})})
+      .addTo(cMap).bindTooltip(`${esc(st.name)} ${esc(st.callsign || "")}`);
+    [20, 50, 100, 200].forEach(nm => L.circle([st.lat, st.lon], {radius: nm * 1852, color: "#d9a93a", weight: 1, opacity: .35, fill: false, dashArray: "4 6"})
+      .bindTooltip(nm + " nm").addTo(cMap));
+  }
+  cLayer = L.layerGroup().addTo(cMap);
+}
+function drawConsoleMap(s) {
+  if (!cMap) return;
+  const keep = new Set();
+  const put = (key, lat, lon, html, sz, tip, onclick, z = 0) => { keep.add(key);
+    const icon = L.divIcon({html, className: "", iconSize: [sz, sz], iconAnchor: [sz / 2, sz / 2]});
+    let m = cMk[key];
+    if (!m) { m = cMk[key] = L.marker([lat, lon], {icon, zIndexOffset: z}).addTo(cLayer); if (onclick) m.on("click", onclick); }
+    else { m.setLatLng([lat, lon]); m.setIcon(icon); m.setZIndexOffset(z); }
+    m.bindTooltip(tip); };
+  for (const v of s.vessels) if (v.lat != null) { const em = v.emergency?.level === "crit";
+    put("v" + v.mmsi, v.lat, v.lon, shipSvg(v), em ? 34 : 26, esc(v.name || v.mmsi) + (em ? " — " + esc(v.emergency.kind) : ""), () => select(v.mmsi), em ? 1000 : 0); }
+  for (const a of s.aircraft || []) if (a.lat != null) put("a" + a.key, a.lat, a.lon, planeSvg(0), 22, `${esc(a.flight || "")} ${esc(a.reg || "")} · ${esc(a.feed)}`);
+  for (const x of (s.sondes || {}).list || []) put("s" + x.serial, x.lat, x.lon, balloonSvg, 24, `Radiosonde ${esc(x.serial)} · ${x.alt} m`);
+  for (const k of Object.keys(cMk)) if (!keep.has(k)) { cLayer.removeLayer(cMk[k]); delete cMk[k]; }
+  $("#cChartInfo").textContent = `${s.vessels.length} vessels · ${(s.aircraft || []).filter(a => a.lat != null).length} aircraft · ${((s.sondes || {}).list || []).length} sondes`;
+}
+const cApi = (path, body) => hfApi(path, body);
+$("#cTune").onclick = () => { const k = parseFloat($("#cKhz").value); if (!k) return alert("Type a frequency in kHz"); cApi("/api/hf/tune", {khz: k, mode: $("#cMode").value}); };
+$("#cKhz").onkeydown = e => { if (e.key === "Enter") $("#cTune").click(); };
+$("#cUp").onclick = () => step(1); $("#cDn").onclick = () => step(-1);
+$("#cScanBtn").onclick = () => cApi("/api/hf/scan", {list: $("#cList").value});
+$("#cStop").onclick = () => cApi("/api/hf/scan", {stop: true});
+[["cNr", "nr"], ["cNotch", "notch"], ["cAgc", "agc"]].forEach(([id, k]) => $("#" + id).onchange = e => cApi("/api/hf/dsp", {[k]: e.target.checked}));
+function renderConsole(s) {
+  if (typeof L === "undefined") {  // no internet for the chart library: range-and-bearing plot instead
+    if (!$("#cRadar")) $("#cMap").innerHTML = `<svg id="cRadar" viewBox="-110 -110 220 220" style="width:100%;height:100%"></svg>`;
+    drawRadar(s, "#cRadar");
+  } else { initConsoleMap(s.station); drawConsoleMap(s); }
+  const hfs = s.hf || [];
+  if (hfs.length) {
+    if (!hfName || !hfs.some(h => h.name === hfName)) hfName = hfs[0].name;
+    if (hfCatRx !== hfName) hfLoadCat();
+    const h = hfCur(s);
+    $("#cLcd").innerHTML = `${h.dial_khz.toFixed(1)} <small>kHz ${esc(h.mode)}</small>`;
+    $("#cChan").textContent = h.channel ? `${h.channel.group} · ${h.channel.label}` : "Manual frequency";
+    $("#cRig").textContent = `${h.name} · ${h.rig_status}`;
+    $("#cVoice").className = "led" + (h.voice ? " on" : ""); $("#cRec").className = "led" + (h.recording ? " rec" : "");
+    $("#cScan").innerHTML = h.scan ? `<span class="pill p-info">SCAN ${esc(h.scan)}${h.holding ? " · HOLD" : ""}</span>` : "";
+    $("#cSnr").textContent = h.snr_db; $("#cSnrBar").style.width = Math.min(100, h.snr_db * 4) + "%";
+    setIf("cNr", "checked", h.nr); setIf("cNotch", "checked", h.notch); setIf("cAgc", "checked", h.agc);
+    $("#cNotched").innerHTML = h.notched_hz.length ? "notched " + h.notched_hz.map(f => `<span class="chip">${f}</span>`).join("") : "";
+    const recent = [...h.heard.map(x => ({t: x.t, txt: `${x.khz} kHz · ${x.label} · ${x.seconds} s`, c: ""})),
+      ...h.selcal.map(c => ({t: c.t, txt: `SELCAL ${c.code} · ${c.khz} kHz${c.watch ? " · " + c.watch : ""}`, c: c.watch ? "warn" : ""}))].sort((a, b) => b.t - a.t).slice(0, 14);
+    $("#cHeard").innerHTML = recent.map(r => `<div class="${r.c}">${utc(r.t)}  ${esc(r.txt)}</div>`).join("") || "<div>Nothing heard yet.</div>";
+    $("#cSel").textContent = h.selcal[0] ? `last SELCAL ${h.selcal[0].code} · ${ago(h.selcal[0].t)} ago` : "";
+  } else { $("#cLcd").innerHTML = "– – –"; $("#cRig").innerHTML = "No HF receiver set up (hf_receivers in config.json)."; }
+  const open = s.alerts.filter(a => !a.acked);
+  $("#cAlertCount").innerHTML = open.length ? `<span class="pill p-${open.some(a => a.level === "crit") ? "crit" : "warn"}">${open.length} open</span>` : `<span class="pill p-ok">clear</span>`;
+  $("#cAlerts").innerHTML = s.alerts.slice(0, 40).map(a => `<div class="alert ${a.acked ? "acked" : ""}"><span class="pill p-${a.level}">${a.level === "crit" ? "EMERG" : a.level === "warn" ? "WARN" : "INFO"}</span>
+    <div><b>${esc(a.title)}</b><p>${esc(a.detail || "")}</p></div><div class="small">${ago(a.last)}${a.acked ? "" : `<br><button onclick="api('/api/ack',{key:${esc(JSON.stringify(a.key))}})">Ack</button>`}</div></div>`).join("")
+    || `<div class="small">No alerts.</div>`;
+  $("#cV").textContent = s.vessels.length; $("#cA").textContent = (s.aircraft || []).length; $("#cR").textContent = s.stats.per_min; $("#cT").textContent = utc(s.time).slice(0, 5);
+  $("#cRxs").innerHTML = [...s.receivers.map(r => `<span class="chip"><span class="led ${r.cat_ok ? "on" : "err"}"></span>AIS ${esc(r.name)} · ${esc(r.channel)} · ${r.frames} msgs</span>`),
+    ...s.dsc.receivers.map(r => `<span class="chip">DSC ${esc(r.name)} · ${r.calls}</span>`),
+    ...(s.hf || []).map(h => `<span class="chip"><span class="led ${h.cat_ok ? "on" : "err"}"></span>HF ${esc(h.name)} · ${h.dial_khz} kHz</span>`),
+    ...s.recorders.map(r => `<span class="chip"><span class="led ${r.recording ? "rec" : r.error ? "err" : "on"}"></span>REC ${esc(r.name)}</span>`),
+    ...((s.sondes || {}).receivers || []).map(r => `<span class="chip">SONDE ${esc(r.name)} · ${r.frames}</span>`),
+    ...((s.feeds || {}).listeners || []).map(l => `<span class="chip">${esc(l.kind.toUpperCase())} · ${l.count}</span>`)].join(" ");
+  const calls = [...s.dsc.log.map(m => ({t: m.t, level: m.level, txt: `DSC ${m.summary} (${m.source})`})),
+    ...(s.hf || []).flatMap(h => h.selcal.map(c => ({t: c.t, level: c.watch ? "warn" : "", txt: `SELCAL ${c.code} · ${c.khz} kHz${c.watch ? " · " + c.watch : ""}`})))]
+    .sort((a, b) => b.t - a.t).slice(0, 40);
+  $("#cCalls").innerHTML = calls.map(c => `<div class="${c.level}">${utc(c.t)}  ${esc(c.txt)}</div>`).join("") || `<div>No calls yet.</div>`;
+  $("#cTl").innerHTML = (s.timeline || []).slice(0, 60).map(e => `<div class="${e.level}">${utc(e.t)}  ${esc(e.kind.toUpperCase())}  ${esc(e.text)}</div>`).join("") || `<div>Nothing yet.</div>`;
+}
+
+/* ---------------- chart: aircraft and radiosondes ---------------- */
+let airLayer = null, airMarkers = {}, sondeLayer = null;
+const planeSvg = h => `<svg width="22" height="22" viewBox="-11 -11 22 22" style="transform:rotate(${h || 0}deg)"><path d="M0-10 1.8-2.5 10 1.5 10 3.2 1.8 1.2 1 7 3.5 9 3.5 10 0 9-3.5 10-3.5 9-1 7-1.8 1.2-10 3.2-10 1.5-1.8-2.5Z" fill="#ffd34d" stroke="#000" stroke-width=".7"/></svg>`;
+const balloonSvg = `<svg width="20" height="26" viewBox="-10 -13 20 26"><ellipse cx="0" cy="-5" rx="7" ry="8" fill="#e05cff" stroke="#000"/><path d="M0 3V12" stroke="#e05cff" stroke-width="1.5"/><rect x="-2" y="10" width="4" height="3" fill="#fff"/></svg>`;
+function drawExtras(s) {
+  if (!map) return;
+  if (!airLayer) { airLayer = L.layerGroup().addTo(map); sondeLayer = L.layerGroup().addTo(map); }
+  const keep = new Set();
+  for (const a of s.aircraft || []) { if (a.lat == null) continue; keep.add(a.key);
+    const tr = a.track || [], p = tr.length > 1 ? tr[tr.length - 2] : null;
+    const hdg = p ? Math.atan2((a.lon - p[1]) * Math.cos(a.lat * Math.PI / 180), a.lat - p[0]) * 180 / Math.PI : 0;
+    const icon = L.divIcon({html: planeSvg(hdg), className: "", iconSize: [22, 22], iconAnchor: [11, 11]});
+    let m = airMarkers[a.key];
+    if (!m) m = airMarkers[a.key] = {mk: L.marker([a.lat, a.lon], {icon}).addTo(airLayer), tr: L.polyline([], {color: "#ffd34d", weight: 1, opacity: .5, dashArray: "3 4"}).addTo(airLayer)};
+    m.mk.setLatLng([a.lat, a.lon]); m.mk.setIcon(icon); m.tr.setLatLngs(tr.map(t => [t[0], t[1]]));
+    m.mk.bindTooltip(`${esc(a.flight || "")} ${esc(a.reg || "")} · ${esc(a.feed)}${a.freq ? " " + a.freq + " kHz" : ""}`); }
+  for (const k of Object.keys(airMarkers)) if (!keep.has(k)) { airLayer.removeLayer(airMarkers[k].mk); airLayer.removeLayer(airMarkers[k].tr); delete airMarkers[k]; }
+  sondeLayer.clearLayers();
+  for (const x of (s.sondes || {}).list || []) {
+    L.polyline((x.track || []).map(t => [t[0], t[1]]), {color: "#e05cff", weight: 2, opacity: .7}).addTo(sondeLayer);
+    L.marker([x.lat, x.lon], {icon: L.divIcon({html: balloonSvg, className: "", iconSize: [20, 26], iconAnchor: [10, 13]})})
+      .bindTooltip(`Radiosonde ${esc(x.serial)} · ${x.alt} m · ${x.climb} m/s`).addTo(sondeLayer);
+    if (x.landing) L.circleMarker([x.landing.lat, x.landing.lon], {radius: 7, color: "#e05cff", dashArray: "3 3", fill: false})
+      .bindTooltip(`Rough landing estimate (${x.landing.minutes} min)`).addTo(sondeLayer);
+  }
+}
+
+async function poll() {
+  try { const s = await (await fetch("/api/state", {cache: "no-store"})).json();
+    if (!inited) { initMap(s.station); inited = true; } last = s; render(s);
+    try { if (tab === "watch") drawExtras(s); } catch (e) { console.log(e); } }
+  catch (e) { $("#sUtc").textContent = "offline"; }
+}
+window.api = api;
+(() => { let t = null; try { t = localStorage.getItem("ocw.tab"); } catch (e) {}
+  if (!t && window.innerWidth >= 1600) t = "console";
+  const b = t && document.querySelector(`#tabs [data-t="${t}"]`); if (b) setTimeout(() => b.click(), 0); })();
+poll(); setInterval(poll, 2000);
+</script>
+</body>
+</html>

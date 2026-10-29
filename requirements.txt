@@ -1,0 +1,6 @@
+numpy>=1.24
+scipy>=1.10
+sounddevice>=0.4    # audio in from radios, announcement playback
+pyserial>=3.5       # CAT control and NMEA serial input
+# Optional:
+#   pyttsx3         text-to-speech version of the station announcement
