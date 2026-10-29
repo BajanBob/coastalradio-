@@ -41,15 +41,26 @@ jobs:
       - name: Build
         shell: bash
         run: |
-          pyinstaller --noconfirm --onefile --name OceanCityWatch \
+          # A program folder (not one packed .exe): starts in seconds instead of unpacking
+          # 100+ MB on every start, and antivirus flags it far less often.
+          pyinstaller --noconfirm --onedir --name OceanCityWatch \
             --add-data "web${{ matrix.sep }}web" \
             --add-data "config.example.json${{ matrix.sep }}." ocw.py
+      - name: Self-test the built program
+        shell: bash
+        run: |
+          set +e
+          ./dist/OceanCityWatch/OceanCityWatch --selftest > selftest.txt 2>&1
+          rc=$?
+          while IFS= read -r line; do echo "::notice title=Self-test ${{ matrix.target }}::$line"; done < selftest.txt
+          exit $rc
       - name: Package
         shell: bash
         run: |
-          cp README.md LICENSE config.example.json dist/
+          cp README.md LICENSE config.example.json dist/OceanCityWatch/
+          if [ "${{ matrix.target }}" = "windows" ]; then cp windows/*.bat dist/OceanCityWatch/; fi
           cd dist
-          if [ "${{ matrix.target }}" = "windows" ]; then 7z a ../OceanCityWatch-windows.zip .; else zip -r ../OceanCityWatch-${{ matrix.target }}.zip .; fi
+          if [ "${{ matrix.target }}" = "windows" ]; then 7z a -tzip ../OceanCityWatch-windows.zip OceanCityWatch; else zip -r -y ../OceanCityWatch-${{ matrix.target }}.zip OceanCityWatch; fi
       - uses: actions/upload-artifact@v4
         with:
           name: OceanCityWatch-${{ matrix.target }}
