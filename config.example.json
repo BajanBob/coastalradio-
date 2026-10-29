@@ -15,17 +15,17 @@
       "name": "IC-9100",
       "enabled": true,
       "rig": "icom",
-      "port": "COM5",
-      "baud": 19200,
+      "port": "COM12",
+      "baud": 9600,
       "civ_address": "0x7C",
-      "audio_device": "USB Audio CODEC",
+      "audio_device": "Microphone (USB Audio CODEC)",
       "audio_channel": 0,
       "sample_rate": 48000,
       "channel": "A"
     },
     {
       "name": "FT-991A",
-      "enabled": true,
+      "enabled": false,
       "rig": "yaesu",
       "port": "COM7",
       "baud": 38400,
@@ -136,7 +136,7 @@
   "recorders": [
     {
       "name": "VHF Ch16",
-      "enabled": true,
+      "enabled": false,
       "audio_device": "Line In",
       "audio_channel": 0,
       "threshold_db": -38,

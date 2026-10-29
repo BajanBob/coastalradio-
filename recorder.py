@@ -44,8 +44,8 @@ class VoxRecorder:
         self.last_file: str | None = None
         try:
             import sounddevice as sd
-            dev = cfg.get("audio_device")
-            dev = int(dev) if isinstance(dev, str) and dev.isdigit() else dev
+            from io_ports import resolve_device
+            dev = resolve_device(cfg.get("audio_device"), "input")
             info = sd.query_devices(dev, "input")
             chans = max(1, min(int(info["max_input_channels"]), self.channel + 1))
             self.stream = sd.InputStream(device=dev, channels=chans, samplerate=self.fs,

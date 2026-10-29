@@ -37,7 +37,8 @@ class AudioOut:
 
     def __init__(self, device, fs_out: int = 48000) -> None:
         import sounddevice as sd
-        dev = int(device) if isinstance(device, str) and device.isdigit() else device
+        from io_ports import resolve_device
+        dev = resolve_device(device, "output")
         self.q: queue.Queue = queue.Queue(maxsize=40)
         self.fs = fs_out
         self.muted = False

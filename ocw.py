@@ -183,9 +183,9 @@ def main() -> int:
         cfg, created = load_config(args.config)
         if created:
             print(f"\n  First run: created {Path(args.config).resolve()}")
-            print("  Open it in Notepad and set your radios' COM ports, audio devices and alerts,")
-            print("  then start the program again. Starting the DEMO now so you can see how it works.\n")
-            args.demo = True
+            print("  It is set for the IC-9100 on COM12 (9600 baud, CI-V 7C) with USB Audio CODEC.")
+            print("  If your radios are different, edit config.json in Notepad and restart.")
+            print("  (Start Demo.bat shows simulated ships if you just want to look around.)\n")
     if args.demo:
         cfg = {"station": {"name": "OCEAN CITY RADIO (DEMO)", "callsign": "8PFX", "lat": 13.0975, "lon": -59.6167},
                "data_dir": tempfile.mkdtemp(prefix="ocw-demo-"), "nmea_udp": [], "_demo": True,

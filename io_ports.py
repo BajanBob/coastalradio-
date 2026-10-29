@@ -25,6 +25,33 @@ def list_audio_devices() -> str:
     return "Audio inputs:\n" + "\n".join(lines)
 
 
+def resolve_device(device, kind: str = "input"):
+    """Turn a config value (number, exact name or part of a name) into one device number.
+    Windows lists each sound card several times (MME, DirectSound, WASAPI…); a plain name would
+    match all of them, so prefer MME (most forgiving about sample rates), then the first match."""
+    import sounddevice as sd
+    if device is None or isinstance(device, int):
+        return device
+    text = str(device).strip()
+    if text.isdigit():
+        return int(text)
+    m = text.split(":", 1)  # "1: Microphone (USB Audio CODEC) (MME)" style from AIS Station
+    if m[0].strip().isdigit() and len(m) == 2:
+        return int(m[0])
+    key = "max_input_channels" if kind == "input" else "max_output_channels"
+    devs = sd.query_devices()
+    apis = [a["name"] for a in sd.query_hostapis()]
+    cands = [(i, d) for i, d in enumerate(devs) if d[key] > 0]
+    exact = [c for c in cands if c[1]["name"].lower() == text.lower()]
+    part = exact or [c for c in cands if text.lower() in c[1]["name"].lower()
+                     or c[1]["name"].lower() in text.lower()]
+    if not part:
+        names = ", ".join(sorted({d["name"] for _, d in cands})) or "none"
+        raise ValueError(f"no {kind} device called '{text}'. Devices found: {names}")
+    part.sort(key=lambda c: (apis[c[1]["hostapi"]] != "MME", c[0]))
+    return part[0][0]
+
+
 class AudioInput:
     """Sound card / USB audio from the radio's DATA (9600) or discriminator output."""
 
@@ -33,7 +60,7 @@ class AudioInput:
         self.q: queue.Queue = queue.Queue(maxsize=200)
         self.channel = channel
         self.sink = sink
-        dev = int(device) if isinstance(device, str) and device.isdigit() else device
+        dev = resolve_device(device, "input")
         info = sd.query_devices(dev, "input")
         chans = max(1, min(int(info["max_input_channels"]), channel + 1))
         self.stream = sd.InputStream(device=dev, channels=chans, samplerate=fs, blocksize=fs // 10,
