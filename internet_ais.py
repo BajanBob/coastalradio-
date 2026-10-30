@@ -42,7 +42,7 @@ class WebSocket:
         path = (u.path or "/") + (f"?{u.query}" if u.query else "")
         self.sock.sendall((f"GET {path} HTTP/1.1\r\nHost: {u.hostname}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
                            f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n"
-                           "User-Agent: OceanCityWatch\r\n\r\n").encode())
+                           "User-Agent: CoastalRadio\r\n\r\n").encode())
         head = b""
         while b"\r\n\r\n" not in head:
             chunk = self.sock.recv(4096)

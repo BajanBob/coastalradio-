@@ -1,6 +1,6 @@
 @echo off
-title Ocean City Watch (demo)
+title Coastal Radio (demo)
 cd /d "%~dp0"
-OceanCityWatch.exe --demo
+CoastalRadio.exe --demo
 echo.
 pause

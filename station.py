@@ -1,4 +1,4 @@
-"""Ocean City Watch engine: receivers, decoding, emergencies, incidents, alerts,
+"""Coastal Radio engine: receivers, decoding, emergencies, incidents, alerts,
 forwarding, voice recorders and station announcements."""
 
 from __future__ import annotations

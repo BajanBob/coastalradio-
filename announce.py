@@ -3,7 +3,7 @@ phonetic call sign, recorded announcement library and playback to the radio's au
 
 Playback is always started by the operator from the dashboard. Keying the
 transmitter (PTT) is done by the operator or by the radio's own VOX / data
-interface; Ocean City Watch never keys a radio itself.
+interface; Coastal Radio never keys a radio itself.
 """
 
 from __future__ import annotations

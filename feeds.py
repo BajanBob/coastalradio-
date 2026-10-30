@@ -9,7 +9,7 @@ or your local network:
   inmarsat  Scytale-C (Inmarsat-C: EGC SafetyNET, NAVAREA warnings, distress relays). JSON or
               plain text lines are both accepted.
 
-The companion program does the demodulation; Ocean City Watch parses the messages,
+The companion program does the demodulation; Coastal Radio parses the messages,
 puts aircraft on the chart, keeps a message log, and raises alerts for distress
 and urgency traffic. JSON field names differ between programs and versions, so
 the parser looks for the meaning (registration, flight, position, text, CPDLC…)

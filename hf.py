@@ -8,7 +8,7 @@ on the same (unprocessed) audio all the time.
 
 SondeReceiver: RS41 decoder fed from SDR/scanner discriminator audio.
 
-Receive-only, like the rest of Ocean City Watch: frequency and mode only.
+Receive-only, like the rest of Coastal Radio: frequency and mode only.
 """
 
 from __future__ import annotations

@@ -64,7 +64,7 @@ class Notifier:
             lines += [f"Position: {lat:.5f}, {lon:.5f}",
                       f"Map: https://www.openstreetmap.org/?mlat={lat:.5f}&mlon={lon:.5f}#map=12/{lat:.5f}/{lon:.5f}"]
         lines.append(f"Time: {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime(a['first']))}")
-        lines.append(f"Sent automatically by Ocean City Watch at {self.station}.")
+        lines.append(f"Sent automatically by Coastal Radio at {self.station}.")
         return subject, "\n".join(lines)
 
     def _run(self) -> None:

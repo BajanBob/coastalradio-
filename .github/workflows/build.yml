@@ -1,4 +1,4 @@
-name: Build Ocean City Watch
+name: Build Coastal Radio
 
 on:
   push:
@@ -43,29 +43,29 @@ jobs:
         run: |
           # A program folder (not one packed .exe): starts in seconds instead of unpacking
           # 100+ MB on every start, and antivirus flags it far less often.
-          pyinstaller --noconfirm --onedir --name OceanCityWatch \
+          pyinstaller --noconfirm --onedir --name CoastalRadio \
             --add-data "web${{ matrix.sep }}web" \
             --add-data "config.example.json${{ matrix.sep }}." ocw.py
       - name: Self-test the built program
         shell: bash
         run: |
           set +e
-          ./dist/OceanCityWatch/OceanCityWatch --selftest > selftest.txt 2>&1
+          ./dist/CoastalRadio/CoastalRadio --selftest > selftest.txt 2>&1
           rc=$?
           while IFS= read -r line; do echo "::notice title=Self-test ${{ matrix.target }}::$line"; done < selftest.txt
           exit $rc
       - name: Package
         shell: bash
         run: |
-          cp README.md LICENSE config.example.json dist/OceanCityWatch/
-          if [ "${{ matrix.target }}" = "windows" ]; then cp windows/*.bat dist/OceanCityWatch/; fi
+          cp README.md LICENSE config.example.json dist/CoastalRadio/
+          if [ "${{ matrix.target }}" = "windows" ]; then cp windows/*.bat dist/CoastalRadio/; fi
           cd dist
-          if [ "${{ matrix.target }}" = "windows" ]; then 7z a -tzip ../OceanCityWatch-windows.zip OceanCityWatch; else zip -r -y ../OceanCityWatch-${{ matrix.target }}.zip OceanCityWatch; fi
+          if [ "${{ matrix.target }}" = "windows" ]; then 7z a -tzip ../CoastalRadio-windows.zip CoastalRadio; else zip -r -y ../CoastalRadio-${{ matrix.target }}.zip CoastalRadio; fi
       - uses: actions/upload-artifact@v4
         with:
-          name: OceanCityWatch-${{ matrix.target }}
-          path: OceanCityWatch-${{ matrix.target }}.zip
+          name: CoastalRadio-${{ matrix.target }}
+          path: CoastalRadio-${{ matrix.target }}.zip
       - if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: OceanCityWatch-${{ matrix.target }}.zip
+          files: CoastalRadio-${{ matrix.target }}.zip

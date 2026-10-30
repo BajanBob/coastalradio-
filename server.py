@@ -1,4 +1,4 @@
-"""Local web server for the Ocean City Watch dashboard (127.0.0.1 only unless --lan)."""
+"""Local web server for the Coastal Radio dashboard (127.0.0.1 only unless --lan)."""
 
 from __future__ import annotations
 
@@ -176,7 +176,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not st.notifier.channels():
                     raise ValueError("No forwarding channels configured in config.json (notify section)")
                 st.notifier.send_alert({"key": f"test:{time.time()}", "level": "info", "kind": "Test",
-                                        "title": "Test message from Ocean City Watch",
+                                        "title": "Test message from Coastal Radio",
                                         "detail": "Alert forwarding is working.", "first": time.time(),
                                         "mmsi": None, "lat": st.lat, "lon": st.lon}, force=True)
             else:

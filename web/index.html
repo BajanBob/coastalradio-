@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ocean City Watch</title>
+<title>Coastal Radio</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <style>
@@ -167,7 +167,7 @@ select{background:var(--field);border:1px solid var(--line);color:var(--ink);bor
 <header>
   <div class="brand"><svg width="30" height="30" viewBox="0 0 40 40"><circle cx="20" cy="20" r="18" fill="none" stroke="#33d6ff" stroke-width="2"/>
     <path d="M7 25c4-4 8-4 12 0s8 4 12 0" fill="none" stroke="#2ee6a6" stroke-width="2.5" stroke-linecap="round"/><path d="M20 6v13M14 12h12" stroke="#33d6ff" stroke-width="2"/></svg>
-    <div><b>OCEAN CITY WATCH</b><small id="stationLine">AIS &amp; SAR WATCH · RECEIVE-ONLY</small></div></div>
+    <div><b>COASTAL RADIO</b><small id="stationLine">AIS &amp; SAR WATCH · RECEIVE-ONLY</small></div></div>
   <div class="stat">Vessels<b id="sVessels">0</b></div>
   <div class="stat">Msg/min<b id="sRate">0</b></div>
   <div class="stat">Best range<b id="sRange">–</b></div>
@@ -229,6 +229,7 @@ select{background:var(--field);border:1px solid var(--line);color:var(--ink);bor
   <button data-t="rec">SAR recorder</button>
   <button data-t="ann">Broadcast</button>
   <button data-t="sys">Station &amp; sharing</button>
+  <button id="navSet" style="border-color:var(--a);color:var(--a)">⚙ Settings</button>
 </nav>
 
 
@@ -398,7 +399,7 @@ select{background:var(--field);border:1px solid var(--line);color:var(--ink);bor
     <div class="small" style="border-top:1px solid var(--line);padding-top:8px;margin-top:8px">
       <b style="color:var(--ink)">Broadcasting is always operator-controlled.</b> "Play to radio" sends the audio to the output set in config.json
       (your marine radio's audio/mic input). You select the channel, check it's clear, and key the transmitter yourself, or use the radio's own VOX/data
-      interface. Ocean City Watch never keys a radio. Make routine broadcasts on a working channel, not Ch16, as your licence and MRCC procedures require.</div></div>
+      interface. Coastal Radio never keys a radio. Make routine broadcasts on a working channel, not Ch16, as your licence and MRCC procedures require.</div></div>
 </div></section>
 
 <section class="tab" id="t-sys"><div class="pad">
@@ -417,7 +418,7 @@ select{background:var(--field);border:1px solid var(--line);color:var(--ink);bor
     <label class="small" style="display:block;margin:6px 0"><input type="checkbox" class="ptpc"> I have listened and the channel is clear</label>
     <label class="small" style="display:block;margin:6px 0"><input type="checkbox" class="ptpc"> I have reviewed the script and I will key the transmitter (or the radio's VOX is set)</label>
     <div class="row" style="margin-top:10px"><button id="ptpGo" class="danger" disabled>▶ Play now</button><button id="ptpCancel">Cancel</button></div>
-    <p class="small">Ocean City Watch never keys a radio. It only plays this audio into the radio's audio input.</p></div></div>
+    <p class="small">Coastal Radio never keys a radio. It only plays this audio into the radio's audio input.</p></div></div>
 
 <script>
 "use strict";
@@ -454,7 +455,7 @@ $("#arm").onclick = async () => { actx = actx || new (window.AudioContext || win
   $("#arm").classList.remove("hot"); $("#arm").textContent = "🔊 Alarm armed"; beep();
   if ("Notification" in window && Notification.permission === "default") Notification.requestPermission(); };
 function notify(a) { try { if ("Notification" in window && Notification.permission === "granted")
-  new Notification("Ocean City Watch: " + a.title, {body: a.detail, requireInteraction: a.level === "crit"}); } catch (e) {} }
+  new Notification("Coastal Radio: " + a.title, {body: a.detail, requireInteraction: a.level === "crit"}); } catch (e) {} }
 
 /* ---------------- chart ---------------- */
 function shipSvg(v) {
@@ -547,7 +548,7 @@ function render(s) {
   $("#alarmbar").className = s.alarm ? "on" + (s.alarm === "warn" ? " warn" : "") : "";
   $("#alarmtext").textContent = top ? `⚠ ${top.level === "crit" ? "EMERGENCY" : "WARNING"}: ${top.title}` + (open.length > 1 ? `  (+${open.length - 1} more)` : "") : "";
   const ec = open.filter(a => a.level !== "info").length; $("#emCount").hidden = !ec; $("#emCount").textContent = ec;
-  document.title = s.alarm === "crit" ? "🔴 EMERGENCY · Ocean City Watch" : s.alarm === "warn" ? "🟠 Ocean City Watch" : "Ocean City Watch";
+  document.title = s.alarm === "crit" ? "🔴 EMERGENCY · Coastal Radio" : s.alarm === "warn" ? "🟠 Coastal Radio" : "Coastal Radio";
   for (const a of s.alerts) { const k = a.key + a.level; if (seen.has(k)) continue; seen.add(k);
     if (!firstLoad && !a.acked && a.level !== "info") { if (a.level === "warn") beep(); notify(a); } }
   firstLoad = false;
@@ -957,6 +958,7 @@ async function openSettings() {
   $("#setMsg").textContent = ""; drawRadios(); $("#setModal").classList.add("on");
 }
 $("#setBtn").onclick = openSettings;
+$("#navSet").onclick = e => { e.stopPropagation(); openSettings(); };
 $("#setClose").onclick = () => $("#setModal").classList.remove("on");
 $("#sAddRx").onclick = () => { syncRadios(); setData.receivers.push({name: "Receiver " + (setData.receivers.length + 1), rig: "manual", channel: "A", enabled: true}); drawRadios(); };
 $("#setSave").onclick = async () => {

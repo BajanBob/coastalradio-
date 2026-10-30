@@ -1,6 +1,6 @@
-# Ocean City Watch
+# Coastal Radio
 
-AIS and search-and-rescue watch-keeping software for **Ocean City Radio, 8PFX**. It runs on the station computer alongside your marine and amateur radios:
+A radio console for coast stations and mariners, built for **Ocean City Radio, 8PFX** and usable by any coast station (set your own call sign and grid square in ⚙ Settings). It runs on the station computer alongside your marine and amateur radios:
 
 - **Receives and decodes AIS** with your IC-9100, FT-991A and FTM-510DR, or any receiver with NMEA output, and shows every vessel on a live chart.
 - **Raises emergency alarms** for AIS-SART, MOB and EPIRB-AIS beacons, distress status and distress text, with a flashing red screen and a siren.
@@ -12,10 +12,10 @@ AIS and search-and-rescue watch-keeping software for **Ocean City Radio, 8PFX**.
 - **HF SSB receiver console:** CAT-tunes your HF rig in USB. The computer adds noise reduction, auto-notch, AGC, a waterfall, PC-speaker audio, scanning that stops on voice, and a recording of every transmission. It has marine, aviation (CAR, NAT, SAT, CEP, NP), VOLMET and HFDL channel lists, plus free dial-frequency entry.
 - **SELCAL and HF DSC decoders** run on the HF audio. SELCAL codes can be put on a watch list. HF DSC distress alerts open incidents just like VHF DSC.
 - **RS41 radiosonde decoder** (needs an SDR on 400–406 MHz): balloon track, burst detection and a rough landing estimate on the chart.
-- **HFDL / HF ACARS / CPDLC, Inmarsat Aero ACARS and Inmarsat-C SafetyNET** through the free decoders dumphfdl, JAERO and Scytale-C (each needs an SDR). Ocean City Watch plots the aircraft, keeps the message logs, flags distress and urgency traffic, and can ask Claude to explain a message.
+- **HFDL / HF ACARS / CPDLC, Inmarsat Aero ACARS and Inmarsat-C SafetyNET** through the free decoders dumphfdl, JAERO and Scytale-C (each needs an SDR). Coastal Radio plots the aircraft, keeps the message logs, flags distress and urgency traffic, and can ask Claude to explain a message.
 - **One station timeline** of everything heard and done.
 
-**Ocean City Watch is receive-only.** It tunes radios (frequency and receive mode) and plays announcement audio only when the operator presses Play. It has no PTT or transmit function. AIS responses must come from your type-approved AIS and DSC equipment, and voice transmissions are made by the operator.
+**Coastal Radio is receive-only.** It tunes radios (frequency and receive mode) and plays announcement audio only when the operator presses Play. It has no PTT or transmit function. AIS responses must come from your type-approved AIS and DSC equipment, and voice transmissions are made by the operator.
 
 ## Quick start
 Requires Python 3.9+.
@@ -94,7 +94,7 @@ When an emergency is detected:
 Treat the MAYDAY RELAY as a draft. Coordinate with your MRCC and follow national procedures before transmitting.
 
 ## DSC watch on Channel 70 (`dsc_receivers`)
-Connect any receiver tuned to **VHF Ch70 (156.525 MHz, FM)** to a sound input. A CAT-controlled rig is tuned automatically; for a marine receiver, use `"rig": "manual"`. Ocean City Watch decodes DSC calls (ITU-R M.493: 1200-baud FSK, time diversity, error-check character):
+Connect any receiver tuned to **VHF Ch70 (156.525 MHz, FM)** to a sound input. A CAT-controlled rig is tuned automatically; for a marine receiver, use `"rig": "manual"`. Coastal Radio decodes DSC calls (ITU-R M.493: 1200-baud FSK, time diversity, error-check character):
 - **Distress alerts and distress relays:** EMERGENCY. The casualty goes on the chart, an incident opens with nature of distress, position and time, and the alert is forwarded.
 - **Urgency calls:** warning.
 - **Safety, routine and test calls, and acknowledgements:** logged on the DSC tab and in `data/logs/dsc-YYYYMMDD.log`.
@@ -125,7 +125,7 @@ On the **Broadcast** tab:
 4. **Make audio** with text-to-speech (`pip install pyttsx3`), or record your own voice.
 5. **▶ PRESS TO PLAY.** Select the audio and press the button. A checklist appears: correct working channel, channel clear, script reviewed and you will key the transmitter. **Play now** only unlocks when all three are ticked. The audio then plays to `announcements.output_device`, the output wired to your marine radio's audio or mic input.
 
-Ocean City Watch never keys a radio and never plays anything on its own. Every broadcast starts with the operator, on a channel the operator chose, under your coast station licence and MRCC procedures.
+Coastal Radio never keys a radio and never plays anything on its own. Every broadcast starts with the operator, on a channel the operator chose, under your coast station licence and MRCC procedures.
 
 ## Alert forwarding (`notify` in config.json)
 - **min_level:** `crit` (emergencies only, the default), `warn` or `info`.
@@ -150,7 +150,7 @@ You can read the script yourself, record it with the computer's microphone, or m
 **Showing 8PFX on vessels' screens:** an announcement is heard, not displayed. For 8PFX to appear on ships' AIS displays, the station needs a type-approved **AIS base station**, which transmits its position automatically. That equipment is separate from this software.
 
 ## HF SSB receiver (`hf_receivers`)
-Your radio demodulates SSB. Ocean City Watch tunes it by CAT, takes its USB audio and does the rest on the computer:
+Your radio demodulates SSB. Coastal Radio tunes it by CAT, takes its USB audio and does the rest on the computer:
 - **Noise reduction** tracks the noise at each audio frequency and removes it. **Strength** sets how hard: higher is quieter, but voices start to sound "watery".
 - **Auto-notch** finds steady carriers and heterodyne whistles (anything constant for several seconds) and cuts them. Speech and SELCAL tones are left alone.
 - **AGC** brings weak and strong stations to the same level. The **waterfall** shows the 0–3 kHz receive passband.
@@ -160,7 +160,7 @@ Your radio demodulates SSB. Ocean City Watch tunes it by CAT, takes its USB audi
 
 **Radios.** Supported: Icom CI-V (IC-9100, IC-7300, IC-7610, IC-705, IC-R8600…), Yaesu (FT-991A) and Kenwood. Shortcuts such as `"rig": "ic9100"` set the CI-V address for you. `"model"` lets the console refuse frequencies the radio can't receive. Use the radio's USB audio (the IC-9100 and FT-991A have built-in USB sound cards) and set the radio's SSB filter to about 2.8–3.0 kHz. A radio can only do one job at a time: a rig on AIS can't also be your HF receiver. The IC-M710 and Barrett 2050 have no CAT interface here, but they can still be recorded with `recorders`.
 
-**IC-9700.** Use `"rig": "ic9700"` (CI-V address A2h). It receives only 144–148, 430–450 and 1240–1300 MHz, so it can't receive marine VHF, AIS, HF or radiosondes (400–406 MHz). In Ocean City Watch it works as a 2 m / 70 cm receiver with the same processing, scanning and recording.
+**IC-9700.** Use `"rig": "ic9700"` (CI-V address A2h). It receives only 144–148, 430–450 and 1240–1300 MHz, so it can't receive marine VHF, AIS, HF or radiosondes (400–406 MHz). In Coastal Radio it works as a 2 m / 70 cm receiver with the same processing, scanning and recording.
 
 **SELCAL** decodes on any channel. Put codes you care about in `selcal_watch` (for example a local operator's aircraft) to get an alert. **HF DSC** decodes whenever you're tuned to a DSC frequency (or scanning the HF DSC list). Distress alerts open an incident and appear on the chart.
 
@@ -169,10 +169,10 @@ Barbados launches RS41-type weather balloons from Grantley Adams. They transmit 
 1. In SDR++ or SDR#, tune the sonde (often 403.0 MHz; watch the waterfall around launch times). Set **NFM**, bandwidth about **15 kHz**, and turn **de-emphasis off**.
 2. Send the audio to a virtual audio cable (VB-CABLE) and set that device as `audio_device`.
 
-Ocean City Watch shows serial, altitude, climb rate, speed, track, burst and a rough landing point. Only Vaisala RS41 is decoded (not M10/M20 or others).
+Coastal Radio shows serial, altitude, climb rate, speed, track, burst and a rough landing point. Only Vaisala RS41 is decoded (not M10/M20 or others).
 
 ## HFDL, HF ACARS, CPDLC and Inmarsat (`feeds`)
-These need an SDR and a dedicated decoder program. Ocean City Watch receives what they decode over UDP. The decoders can run on this PC, a Raspberry Pi or WSL.
+These need an SDR and a dedicated decoder program. Coastal Radio receives what they decode over UDP. The decoders can run on this PC, a Raspberry Pi or WSL.
 
 | Feed | Decoder | Hardware | Send to |
 |---|---|---|---|
@@ -183,7 +183,7 @@ These need an SDR and a dedicated decoder program. Ocean City Watch receives wha
 Example dumphfdl command for the 8 MHz HFDL band on an Airspy HF+:
 `dumphfdl --soapysdr driver=airspyhf --sample-rate 912000 --centerfreq 8900 8912 8927 8942 8948 8957 8977 --output decoded:json:udp:address=192.168.3.169,port=5555`
 
-The parser looks for registration, flight, position, message text and CPDLC anywhere in each message, so different program versions work. Aircraft with a position appear on the chart in yellow. Messages containing distress or urgency wording (MAYDAY, PAN PAN, EPIRB, SAR, 7700…) raise an alert. With an Anthropic key under `ai`, Claude adds a plain-English explanation and distance from the station to those messages; any message can be explained with **Explain**. When Windows asks, allow Ocean City Watch on private networks.
+The parser looks for registration, flight, position, message text and CPDLC anywhere in each message, so different program versions work. Aircraft with a position appear on the chart in yellow. Messages containing distress or urgency wording (MAYDAY, PAN PAN, EPIRB, SAR, 7700…) raise an alert. With an Anthropic key under `ai`, Claude adds a plain-English explanation and distance from the station to those messages; any message can be explained with **Explain**. When Windows asks, allow Coastal Radio on private networks.
 
 These are listening tools. Messages decoded from aviation and satellite links are for your own awareness; check the rules in Barbados about sharing their content.
 

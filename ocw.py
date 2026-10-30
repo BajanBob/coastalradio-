@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Ocean City Watch: receive-only AIS and SAR watch-keeping for a coast station.
+"""Coastal Radio: receive-only AIS and SAR watch-keeping for a coast station.
 
     python ocw.py --list-audio          show sound inputs / outputs
     python ocw.py                       run with config.json
     python ocw.py --demo                simulated ships (and a simulated AIS-SART) through the real decoder
     python ocw.py --wav recording.wav   decode a recording of a radio's 9600 audio
 
-Radios are only tuned (frequency + FM mode). Ocean City Watch has no
+Radios are only tuned (frequency + FM mode). Coastal Radio has no
 transmit or PTT function; announcements are played only when the operator
 presses Play, and the operator keys the radio.
 """
@@ -158,7 +158,7 @@ def list_devices() -> str:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Ocean City Watch: AIS & SAR watch for coast stations")
+    ap = argparse.ArgumentParser(description="Coastal Radio: AIS & SAR watch for coast stations")
     ap.add_argument("--config", default="config.json")
     ap.add_argument("--list-audio", action="store_true", help="List audio devices and exit")
     ap.add_argument("--demo", action="store_true", help="Simulated ships and a simulated AIS-SART")
@@ -252,7 +252,7 @@ def main() -> int:
         print(f"  Ports {port}-{port + 9} are all busy. Close other copies of the program and try again.")
         return 1
     url = f"http://127.0.0.1:{port}/"
-    print(f"\n  OCEAN CITY WATCH running{' (DEMO)' if args.demo else ''}. Dashboard: {url}")
+    print(f"\n  COASTAL RADIO running{' (DEMO)' if args.demo else ''}. Dashboard: {url}")
     print(f"  Data folder: {Path(cfg.get('data_dir', 'data')).resolve()}")
     print("  Receive-only: no transmit function. Press Ctrl+C to stop.\n")
     if not args.no_browser:
