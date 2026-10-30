@@ -38,6 +38,32 @@ def maidenhead(lat: float, lon: float, chars: int = 6) -> str:
     return out[:2] + out[2:4] + out[4:].lower() if chars >= 6 else out
 
 
+def grid_to_latlon(grid: str) -> tuple[float, float]:
+    """Centre of a Maidenhead locator (4, 6 or 8 characters), e.g. GK03ec → (13.1, -59.6)."""
+    g = grid.strip()
+    if len(g) not in (4, 6, 8):
+        raise ValueError("Grid square must be 4, 6 or 8 characters, e.g. GK03 or GK03ec")
+    g = g[:2].upper() + g[2:4] + g[4:6].lower() + g[6:8]
+    if not ("A" <= g[0] <= "R" and "A" <= g[1] <= "R" and g[2:4].isdigit()):
+        raise ValueError(f"'{grid}' isn't a valid grid square")
+    lon = (ord(g[0]) - 65) * 20 - 180 + int(g[2]) * 2
+    lat = (ord(g[1]) - 65) * 10 - 90 + int(g[3])
+    w, h = 2.0, 1.0
+    if len(g) >= 6:
+        if not ("a" <= g[4] <= "x" and "a" <= g[5] <= "x"):
+            raise ValueError(f"'{grid}' isn't a valid grid square")
+        w, h = 2 / 24, 1 / 24
+        lon += (ord(g[4]) - 97) * w
+        lat += (ord(g[5]) - 97) * h
+    if len(g) == 8:
+        if not g[6:8].isdigit():
+            raise ValueError(f"'{grid}' isn't a valid grid square")
+        w, h = w / 10, h / 10
+        lon += int(g[6]) * w
+        lat += int(g[7]) * h
+    return round(lat + h / 2, 5), round(lon + w / 2, 5)
+
+
 def dm(lat: float, lon: float) -> tuple[str, str]:
     """Degrees and decimal minutes, the usual marine format."""
     def fmt(v, pos, neg, width):
@@ -136,15 +162,54 @@ class Announcer:
             p.unlink(missing_ok=True)
 
     def tts(self, text: str, name: str) -> str:
-        try:
-            import pyttsx3
-        except ImportError as e:
-            raise RuntimeError("Text-to-speech needs: pip install pyttsx3 (or record your own voice)") from e
+        """Text → WAV. Uses the voices built into the computer: Windows speech (no extra install),
+        macOS 'say', espeak on Linux, or pyttsx3 if it is installed."""
+        import platform
+        import subprocess
         p = self.dir / self.safe_name(name)
-        eng = pyttsx3.init()
-        eng.setProperty("rate", 150)
-        eng.save_to_file(text, str(p))
-        eng.runAndWait()
+        p.unlink(missing_ok=True)
+        errors = []
+        system = platform.system()
+        if system == "Windows":
+            txt = p.with_suffix(".txt")
+            txt.write_text(text, encoding="utf-8")
+            ps = ("Add-Type -AssemblyName System.Speech; "
+                  "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; $s.Rate = -1; "
+                  "$f = New-Object System.Speech.AudioFormat.SpeechAudioFormatInfo(22050, 16, 1); "
+                  f"$s.SetOutputToWaveFile('{p}', $f); "
+                  f"$s.Speak([IO.File]::ReadAllText('{txt}')); $s.Dispose()")
+            try:
+                subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps], check=True,
+                               capture_output=True, timeout=120, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            except Exception as e:  # noqa: BLE001
+                errors.append(f"Windows speech: {e}")
+            finally:
+                txt.unlink(missing_ok=True)
+        elif system == "Darwin":
+            try:
+                subprocess.run(["say", "-r", "160", "-o", str(p), "--data-format=LEI16@22050", text],
+                               check=True, capture_output=True, timeout=120)
+            except Exception as e:  # noqa: BLE001
+                errors.append(f"say: {e}")
+        else:
+            for exe in ("espeak-ng", "espeak"):
+                try:
+                    subprocess.run([exe, "-s", "150", "-w", str(p), text], check=True, capture_output=True, timeout=120)
+                    break
+                except Exception as e:  # noqa: BLE001
+                    errors.append(f"{exe}: {e}")
+        if not (p.exists() and p.stat().st_size > 1000):
+            try:
+                import pyttsx3
+                eng = pyttsx3.init()
+                eng.setProperty("rate", 150)
+                eng.save_to_file(text, str(p))
+                eng.runAndWait()
+            except Exception as e:  # noqa: BLE001
+                errors.append(f"pyttsx3: {e}")
+        if not (p.exists() and p.stat().st_size > 1000):
+            raise RuntimeError("Couldn't make speech on this computer (" + "; ".join(errors)[:300] +
+                               "). You can record your own voice instead.")
         return p.name
 
     def play(self, name: str) -> None:

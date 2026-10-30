@@ -199,6 +199,7 @@ def main() -> int:
     elif args.wav:
         cfg = {"station": {"name": "WAV FILE"}, "nmea_udp": [], "data_dir": "data"}
     st = Station(cfg)
+    st.config_path = None if (args.demo or args.wav) else args.config  # the Settings page saves here
 
     if args.demo:
         from station import DscReceiver

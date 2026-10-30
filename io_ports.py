@@ -65,6 +65,7 @@ class AudioInput:
         chans = max(1, min(int(info["max_input_channels"]), channel + 1))
         self.stream = sd.InputStream(device=dev, channels=chans, samplerate=fs, blocksize=fs // 10,
                                      dtype="float32", callback=self._cb)
+        self.running = True
         threading.Thread(target=self._run, daemon=True).start()
         self.stream.start()
 
@@ -75,8 +76,44 @@ class AudioInput:
             pass
 
     def _run(self) -> None:
-        while True:
-            self.sink(self.q.get())
+        while self.running:
+            try:
+                self.sink(self.q.get(timeout=0.5))
+            except queue.Empty:
+                continue
+
+    def close(self) -> None:
+        self.running = False
+        try:
+            self.stream.stop()
+            self.stream.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def list_audio(kind: str = "input") -> list[dict]:
+    """Sound devices for the Settings page (one entry per name, MME preferred, like resolve_device)."""
+    try:
+        import sounddevice as sd
+        devs, apis = sd.query_devices(), [a["name"] for a in sd.query_hostapis()]
+    except Exception:  # noqa: BLE001
+        return []
+    key = "max_input_channels" if kind == "input" else "max_output_channels"
+    seen, out = set(), []
+    for i, d in sorted(enumerate(devs), key=lambda x: (apis[x[1]["hostapi"]] != "MME", x[0])):
+        if d[key] > 0 and d["name"] not in seen:
+            seen.add(d["name"])
+            out.append({"index": i, "name": d["name"], "api": apis[d["hostapi"]]})
+    return sorted(out, key=lambda x: x["name"].lower())
+
+
+def list_serial_ports() -> list[dict]:
+    try:
+        from serial.tools import list_ports
+    except ImportError:
+        return []
+    return [{"device": p.device, "description": p.description or ""}
+            for p in sorted(list_ports.comports(), key=lambda p: p.device)]
 
 
 class WavInput:
@@ -151,12 +188,22 @@ class NmeaOutput:
         self.lock = threading.Lock()
         self.log = Path(log_file) if log_file else None
         self.tcp_port = tcp_port
+        self.error = None
         if tcp_port:
-            srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            srv.bind(("0.0.0.0", tcp_port))
-            srv.listen(8)
-            threading.Thread(target=self._accept, args=(srv,), daemon=True).start()
+            try:
+                srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):  # Windows: don't share the port silently
+                    srv.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+                else:
+                    srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                srv.bind(("0.0.0.0", tcp_port))
+                srv.listen(8)
+                threading.Thread(target=self._accept, args=(srv,), daemon=True).start()
+            except OSError as e:
+                # usually AIS Station (or another copy) already serves NMEA on this port: carry on without it
+                self.tcp_port = None
+                self.error = f"NMEA TCP port {tcp_port} is busy (is AIS Station running?): {e.strerror or e}"
+                print(f"  {self.error}. Continuing without the TCP NMEA output.")
 
     def _accept(self, srv) -> None:
         while True:

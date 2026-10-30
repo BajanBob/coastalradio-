@@ -149,6 +149,16 @@ select{background:var(--field);border:1px solid var(--line);color:var(--ink);bor
 @media (max-width:1200px){.console{grid-template-columns:1fr;grid-template-rows:none;grid-template-areas:"chart" "hf" "wf" "alerts" "ais" "calls" "data";height:auto}
   #t-console{height:auto}#cMap{height:55vh;flex:none}#wf2{height:200px;flex:none}}
 .face{display:flex;gap:6px;align-items:center}
+#setModal{position:fixed;inset:0;background:#000a;z-index:3000;display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:30px 12px}
+#setModal.on{display:flex}
+#setModal .box{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--bezel);border-radius:14px;max-width:1100px;width:100%;padding:16px 18px}
+#setModal h3{margin:14px 0 8px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold)}
+#setModal .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px 12px}
+#setModal label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--dim)}
+#setModal input,#setModal select{background:var(--field);border:1px solid var(--line);color:var(--ink);border-radius:7px;padding:6px 8px;font:13px system-ui}
+.radio{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;background:var(--field)}
+.radio .grid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+#setMsg{margin-left:10px}
 .face select{padding:3px 6px}
 #dimmer{width:80px;display:none}:root[data-face="night"] #dimmer{display:inline-block}
 </style>
@@ -169,9 +179,30 @@ select{background:var(--field);border:1px solid var(--line);color:var(--ink);bor
     <label class="small" title="Switch to the night faceplate between sunset and sunrise at the station"><input type="checkbox" id="autoNight"> auto night</label>
     <input type="range" id="dimmer" min="0.35" max="1" step="0.05" title="Night brightness"></div>
   <button id="arm" class="hot" title="Browsers allow sound only after a click">🔈 Arm alarm sound</button>
+  <button id="setBtn" class="primary">⚙ Settings</button>
   <button id="snapBtn">📸 Snapshot</button>
   <button id="ackAll">Acknowledge all</button>
 </header>
+
+<div id="setModal"><div class="box">
+  <div class="row"><b style="font-size:16px">Settings</b><span class="sp" style="flex:1"></span><span class="small" id="setPath"></span><button id="setClose">✕ Close</button></div>
+  <h3>Station identity</h3>
+  <div class="grid">
+    <label>Station name<input id="sName" placeholder="OCEAN CITY RADIO"></label>
+    <label>Call sign<input id="sCall" placeholder="8PFX" style="text-transform:uppercase"></label>
+    <label>Grid square (Maidenhead)<input id="sGrid" placeholder="GK03ec"></label>
+    <label>Latitude (decimal, N +)<input id="sLat" inputmode="decimal" placeholder="13.0975"></label>
+    <label>Longitude (decimal, E +, W −)<input id="sLon" inputmode="decimal" placeholder="-59.6167"></label>
+  </div>
+  <p class="small">Type a grid square and the position fills in (centre of the square), or type latitude/longitude and the grid square fills in.
+    For example, North Post Radio, Trinidad: call sign <b>9YL</b>, grid <b>FK90</b>. The name and call sign are used on the console, in reports,
+    broadcasts and alert messages; ranges and bearings are measured from this position.</p>
+  <h3>AIS receivers</h3><div id="sRx"></div><button id="sAddRx">+ Add AIS receiver</button>
+  <h3>HF receiver</h3><div id="sHf"></div>
+  <p class="small">COM ports and sound devices are the ones this computer can see right now. If your radio isn't listed, check its USB cable and power,
+    then close and reopen Settings. To look around without radios, close the program and double-click <b>Start Demo.bat</b>.</p>
+  <div class="row" style="margin-top:12px"><button class="primary" id="setSave">💾 Save settings</button><span class="small" id="setMsg"></span></div>
+</div></div>
 <div id="alarmbar"><span id="alarmtext"></span><button id="alarmAck">ACKNOWLEDGE</button></div>
 <nav id="tabs">
   <button data-t="console">▣ Console</button>
@@ -845,6 +876,77 @@ function renderTl(s) {
     : `<tr><td colspan="4" class="small">Nothing yet.</td></tr>`;
 }
 
+
+
+/* ---------------- settings ---------------- */
+let setData = null;
+const RIGS = [["manual", "Manual (tune by hand)"], ["ic9100", "Icom IC-9100"], ["ic9700", "Icom IC-9700 (2 m/70 cm/23 cm only)"],
+  ["ic7300", "Icom IC-7300"], ["ic7610", "Icom IC-7610"], ["ic705", "Icom IC-705"], ["icom", "Icom (other CI-V)"],
+  ["yaesu", "Yaesu (FT-991A etc.)"], ["kenwood", "Kenwood"]];
+function gridOf(lat, lon) { lon += 180; lat += 90; let g = String.fromCharCode(65 + Math.floor(lon / 20)) + String.fromCharCode(65 + Math.floor(lat / 10));
+  lon %= 20; lat %= 10; g += Math.floor(lon / 2) + "" + Math.floor(lat); lon %= 2; lat %= 1;
+  return g + String.fromCharCode(97 + Math.floor(lon * 12)) + String.fromCharCode(97 + Math.floor(lat * 24)); }
+function latlonOf(g) { g = g.trim(); if (!/^[A-Ra-r]{2}\d{2}([A-Xa-x]{2})?$/.test(g)) return null;
+  let lon = (g.toUpperCase().charCodeAt(0) - 65) * 20 - 180 + (+g[2]) * 2, lat = (g.toUpperCase().charCodeAt(1) - 65) * 10 - 90 + (+g[3]), w = 2, h = 1;
+  if (g.length === 6) { w = 2 / 24; h = 1 / 24; lon += (g.toLowerCase().charCodeAt(4) - 97) * w; lat += (g.toLowerCase().charCodeAt(5) - 97) * h; }
+  return [+(lat + h / 2).toFixed(5), +(lon + w / 2).toFixed(5)]; }
+$("#sGrid").oninput = () => { const p = latlonOf($("#sGrid").value); if (p) { $("#sLat").value = p[0]; $("#sLon").value = p[1]; } };
+const llChanged = () => { const la = parseFloat($("#sLat").value), lo = parseFloat($("#sLon").value);
+  if (isFinite(la) && isFinite(lo) && Math.abs(la) <= 90 && Math.abs(lo) <= 180) $("#sGrid").value = gridOf(la, lo); };
+$("#sLat").oninput = llChanged; $("#sLon").oninput = llChanged;
+const opt = (list, cur, blank) => { const vals = list.map(x => x[0]); const extra = cur != null && cur !== "" && !vals.includes(String(cur)) ? [[String(cur), cur + " (not found now)"]] : [];
+  return (blank ? `<option value="">${blank}</option>` : "") + [...list, ...extra].map(([v, t]) => `<option value="${esc(v)}" ${String(cur) === String(v) ? "selected" : ""}>${esc(t)}</option>`).join(""); };
+function radioHtml(r, i, hf) {
+  const ports = setData.ports.map(p => [p.device, `${p.device}${p.description ? " · " + p.description : ""}`]);
+  const ain = setData.audio_in.map(a => [a.name, a.name]), aout = setData.audio_out.map(a => [a.name, a.name]);
+  return `<div class="radio" data-i="${i}" data-hf="${hf ? 1 : 0}"><div class="grid">
+    <label>Name<input data-k="name" value="${esc(r.name || "")}"></label>
+    <label>Radio<select data-k="rig">${opt(RIGS, r.rig || "manual")}</select></label>
+    <label>COM port (CAT)<select data-k="port">${opt(ports, r.port, "— none —")}</select></label>
+    <label>Baud<select data-k="baud">${opt([["4800", "4800"], ["9600", "9600"], ["19200", "19200"], ["38400", "38400"], ["57600", "57600"], ["115200", "115200"]], r.baud || 9600)}</select></label>
+    <label>CI-V address (Icom)<input data-k="civ_address" value="${esc(r.civ_address || "")}" placeholder="auto"></label>
+    <label>Audio from radio<select data-k="audio_device">${opt(ain, r.audio_device, "— none —")}</select></label>
+    ${hf ? `<label>PC speakers (optional)<select data-k="output_device">${opt(aout, r.output_device, "— listen on the radio —")}</select></label>
+            <label>Start frequency kHz<input data-k="start_khz" value="${esc(r.start_khz ?? 8291)}"></label>`
+         : `<label>AIS channel<select data-k="channel">${opt([["A", "A · 161.975"], ["B", "B · 162.025"], ["SCAN", "Scan A/B"]], r.channel || "A")}</select></label>`}
+    <label>On<select data-k="enabled">${opt([["true", "Enabled"], ["false", "Off"]], String(r.enabled !== false))}</select></label>
+  </div><div class="row" style="margin-top:6px"><button data-test>Test CAT</button><span class="small" data-res></span>
+    ${hf ? "" : `<span class="sp" style="flex:1"></span><button class="danger" data-del>Remove</button>`}</div></div>`;
+}
+function readRadio(el) { const o = {}; el.querySelectorAll("[data-k]").forEach(x => { o[x.dataset.k] = x.value; });
+  o.enabled = o.enabled === "true"; if (o.rig && o.rig.startsWith("ic") && o.rig !== "icom" && !o.model) o.model = o.rig; return o; }
+function drawRadios() {
+  $("#sRx").innerHTML = setData.receivers.map((r, i) => radioHtml(r, i, false)).join("") || `<div class="small">No AIS receivers. Add one.</div>`;
+  $("#sHf").innerHTML = radioHtml(setData.hf || {name: "HF receiver", enabled: false}, 0, true);
+  document.querySelectorAll("#setModal [data-test]").forEach(b => b.onclick = async () => {
+    const box = b.closest(".radio"), res = box.querySelector("[data-res]"); res.textContent = "testing…";
+    const r = await fetch("/api/test_cat", {method: "POST", headers: {"X-OCW": "1", "Content-Type": "application/json"},
+      body: JSON.stringify({radio: readRadio(box), hf: box.dataset.hf === "1"})}).then(x => x.json()).catch(() => ({}));
+    res.textContent = (r.ok ? "✓ " : "✗ ") + (r.status || r.error || "no reply"); });
+  document.querySelectorAll("#setModal [data-del]").forEach(b => b.onclick = () => { syncRadios(); setData.receivers.splice(+b.closest(".radio").dataset.i, 1); drawRadios(); });
+}
+function syncRadios() { setData.receivers = [...document.querySelectorAll('#sRx .radio')].map(readRadio); setData.hf = readRadio($("#sHf .radio")); }
+async function openSettings() {
+  setData = await (await fetch("/api/settings", {cache: "no-store"})).json();
+  const st = setData.station;
+  $("#sName").value = st.name || ""; $("#sCall").value = st.callsign || ""; $("#sGrid").value = st.grid || "";
+  $("#sLat").value = st.lat ?? ""; $("#sLon").value = st.lon ?? "";
+  $("#setPath").textContent = setData.demo ? "DEMO: settings can't be saved" : (setData.config_path ? "Saves to " + setData.config_path : "");
+  $("#setMsg").textContent = ""; drawRadios(); $("#setModal").classList.add("on");
+}
+$("#setBtn").onclick = openSettings;
+$("#setClose").onclick = () => $("#setModal").classList.remove("on");
+$("#sAddRx").onclick = () => { syncRadios(); setData.receivers.push({name: "Receiver " + (setData.receivers.length + 1), rig: "manual", channel: "A", enabled: true}); drawRadios(); };
+$("#setSave").onclick = async () => {
+  syncRadios();
+  const body = {station: {name: $("#sName").value, callsign: $("#sCall").value, grid: $("#sGrid").value, lat: $("#sLat").value, lon: $("#sLon").value},
+                receivers: setData.receivers, hf: setData.hf};
+  $("#setMsg").textContent = "saving…";
+  const r = await fetch("/api/settings", {method: "POST", headers: {"X-OCW": "1", "Content-Type": "application/json"}, body: JSON.stringify(body)})
+    .then(x => x.json()).catch(e => ({ok: false, error: String(e)}));
+  $("#setMsg").textContent = r.ok ? "✓ " + r.message : "✗ " + (r.error || "failed");
+  if (r.ok) setTimeout(() => location.reload(), 2500);  // redraw the chart around the new position
+};
 
 /* ---------------- faceplates ---------------- */
 const store = {get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } },

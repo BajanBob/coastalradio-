@@ -66,6 +66,7 @@ class DscReceiver:
 class Receiver:
     def __init__(self, station: "Station", cfg: dict, fs: int) -> None:
         self.station = station
+        self.cfg = cfg
         self.name = cfg.get("name", "Receiver")
         self.mode = (cfg.get("channel") or "A").upper()  # A, B or SCAN
         self.scan_s = int(cfg.get("scan_seconds", 30))
@@ -167,14 +168,150 @@ class Station:
         fs = int(rcfg.get("sample_rate", 48000))
         rx = Receiver(self, rcfg, fs)
         self.receivers.append(rx)
+        rx.audio = None
         if rcfg.get("wav"):
             WavInput(rcfg["wav"], rx.feed, loop=bool(rcfg.get("loop")))
-        elif rcfg.get("audio_device") is not None:
+        elif rcfg.get("audio_device") not in (None, ""):
             try:
-                AudioInput(rcfg["audio_device"], int(rcfg.get("audio_channel", 0)), fs, rx.feed)
+                rx.audio = AudioInput(rcfg["audio_device"], int(rcfg.get("audio_channel", 0)), fs, rx.feed)
             except Exception as e:  # noqa: BLE001
                 rx.error = f"Audio: {e}"
         return rx
+
+    # -------------------------------------------------- settings page
+    RX_KEYS = ("name", "enabled", "rig", "port", "baud", "civ_address", "audio_device", "audio_channel", "channel",
+               "scan_seconds")
+    HF_KEYS = ("name", "enabled", "rig", "model", "port", "baud", "civ_address", "audio_device", "output_device",
+               "start_khz")
+
+    def settings(self) -> dict:
+        from announce import maidenhead
+        from io_ports import list_audio, list_serial_ports
+        st = self.cfg.get("station", {})
+        hf = (self.cfg.get("hf_receivers") or [{}])[0]
+        return {"station": {"name": st.get("name", ""), "callsign": st.get("callsign", ""), "lat": st.get("lat"),
+                            "lon": st.get("lon"),
+                            "grid": maidenhead(st["lat"], st["lon"]) if st.get("lat") is not None and st.get("lon") is not None else ""},
+                "receivers": [{k: r.get(k) for k in self.RX_KEYS if k in r} for r in self.cfg.get("receivers", [])],
+                "hf": {k: hf.get(k) for k in self.HF_KEYS if k in hf},
+                "ports": list_serial_ports(), "audio_in": list_audio("input"), "audio_out": list_audio("output"),
+                "config_path": str(Path(self.config_path).resolve()) if getattr(self, "config_path", None) else None,
+                "demo": bool(self.cfg.get("_demo"))}
+
+    @staticmethod
+    def _clean_radio(r: dict, hf: bool = False) -> dict:
+        from cat import ICOM_MODELS
+        rig = str(r.get("rig") or "manual").lower().replace("-", "")
+        if rig not in ("icom", "yaesu", "kenwood", "manual") and rig not in ICOM_MODELS:
+            raise ValueError(f"Unknown radio type {rig}")
+        name = str(r.get("name") or ("HF receiver" if hf else "Receiver")).strip()[:40]
+        out = {"name": name, "enabled": bool(r.get("enabled", True)), "rig": rig,
+               "audio_channel": int(r.get("audio_channel") or 0), "sample_rate": 48000}
+        for k in ("audio_device", "output_device") if hf else ("audio_device",):
+            v = r.get(k)
+            out[k] = (int(v) if str(v).isdigit() else str(v)) if v not in (None, "") else None
+        if not hf:
+            ch = str(r.get("channel") or "A").upper()
+            if ch not in ("A", "B", "SCAN"):
+                raise ValueError("Channel must be A, B or SCAN")
+            out["channel"] = ch
+            out["scan_seconds"] = max(10, min(86400, int(r.get("scan_seconds") or 600)))
+        else:
+            out["model"] = str(r.get("model") or "").lower()
+            out["start_khz"] = float(r.get("start_khz") or 8291)
+        if rig != "manual":
+            if not r.get("port"):
+                raise ValueError(f"{name}: choose a COM port, or set the radio type to Manual")
+            out["port"] = str(r["port"])
+            out["baud"] = int(r.get("baud") or (9600 if rig in ("kenwood",) else 38400 if rig == "yaesu" else 19200))
+            if rig == "icom" or rig in ICOM_MODELS:
+                addr = str(r.get("civ_address") or (hex(ICOM_MODELS[rig]) if rig in ICOM_MODELS else "0x7C"))
+                int(addr, 16)  # validates
+                out["civ_address"] = addr
+        return out
+
+    def apply_settings(self, new: dict) -> str:
+        """Check the page's settings, save them to config.json and apply them."""
+        from announce import grid_to_latlon, maidenhead
+        stn = new.get("station", {})
+        call = "".join(ch for ch in str(stn.get("callsign") or "").upper() if ch.isalnum() or ch in "/-")[:12]
+        name = str(stn.get("name") or "").strip()[:60] or "Coast station"
+        grid = str(stn.get("grid") or "").strip()
+        lat = float(stn["lat"]) if stn.get("lat") not in (None, "") else None
+        lon = float(stn["lon"]) if stn.get("lon") not in (None, "") else None
+        if (lat is None or lon is None) and grid:
+            lat, lon = grid_to_latlon(grid)
+        elif grid and lat is not None and maidenhead(lat, lon, len(grid))[:len(grid)].upper() != grid.upper():
+            lat, lon = grid_to_latlon(grid)  # the grid was changed by hand: it wins
+        if lat is None or lon is None:
+            raise ValueError("Enter the station's grid square, or its latitude and longitude")
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            raise ValueError("Latitude must be -90..90 and longitude -180..180")
+        receivers = [self._clean_radio(r) for r in new.get("receivers", [])]
+        if len({r["name"] for r in receivers}) != len(receivers):
+            raise ValueError("Each AIS receiver needs a different name")
+        hf = self._clean_radio(new["hf"], hf=True) if new.get("hf") else None
+        if not getattr(self, "config_path", None):
+            raise ValueError("Settings can't be saved in demo mode. Start the program normally to change them.")
+        p = Path(self.config_path)
+        try:
+            saved = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+        except ValueError:
+            saved = {}
+        saved.setdefault("station", {}).update({"name": name, "callsign": call, "lat": round(lat, 5), "lon": round(lon, 5)})
+        old = {r.get("name"): r for r in saved.get("receivers", [])}
+        saved["receivers"] = [{**{k: v for k, v in old.get(r["name"], {}).items() if k not in self.RX_KEYS}, **r}
+                              for r in receivers]
+        hf_changed = False
+        if hf:
+            hfl = saved.get("hf_receivers") or [{}]
+            before = {k: hfl[0].get(k) for k in self.HF_KEYS}
+            hfl[0] = {**hfl[0], **hf}
+            hf_changed = before != {k: hfl[0].get(k) for k in self.HF_KEYS}
+            saved["hf_receivers"] = hfl
+        tmp = p.with_suffix(".tmp")
+        tmp.write_text(json.dumps(saved, indent=2), encoding="utf-8")
+        tmp.replace(p)
+        # station identity: live
+        self.cfg["station"] = saved["station"]
+        self.info.clear()
+        self.info.update(saved["station"])
+        self.name, self.callsign, self.lat, self.lon = name, call, lat, lon
+        self.tracker.lat, self.tracker.lon = lat, lon
+        self.watch.slat, self.watch.slon = lat, lon
+        self.notifier.station = f"{name} {call}".strip()
+        # AIS receivers: restart with the new settings
+        for rx in self.receivers:
+            try:
+                if getattr(rx, "audio", None):
+                    rx.audio.close()
+                rx.rig.close()
+            except Exception:  # noqa: BLE001
+                pass
+        self.receivers = []
+        self.cfg["receivers"] = saved["receivers"]
+        for r in saved["receivers"]:
+            if r.get("enabled", True):
+                self.add_audio_receiver(r)
+        self.cfg["hf_receivers"] = saved.get("hf_receivers", self.cfg.get("hf_receivers"))
+        msg = f"Saved to {p.name}. Station {call or name} at {maidenhead(lat, lon)} is live; AIS receivers restarted."
+        if hf_changed:
+            msg += " Restart the program for the HF receiver changes."
+        return msg
+
+    def test_cat(self, r: dict, hf: bool = False) -> dict:
+        r = self._clean_radio(r, hf)
+        if r["rig"] == "manual":
+            return {"ok": True, "status": "Manual radio: nothing to test. Tune it by hand."}
+        live = [x for x in self.receivers + self.hf_receivers if (x.cfg if hasattr(x, "cfg") else {}).get("port") == r["port"]]
+        if live:
+            return {"ok": False, "status": f"{r['port']} is in use by {live[0].name}. Save the settings to apply them."}
+        rig = make_rig(r)
+        try:
+            ok = rig.tune(int(r["start_khz"] * 1000) if hf else CHANNELS["A"], "USB" if hf else "FM")
+            return {"ok": ok, "status": rig.status}
+        finally:
+            rig.close()
 
     def add_nmea_inputs(self) -> None:
         for p in self.cfg.get("nmea_in_udp", []):

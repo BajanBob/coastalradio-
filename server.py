@@ -48,6 +48,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, (WEB / "index.html").read_bytes(), "text/html; charset=utf-8")
         if path == "/api/state":
             return self._json(self.station.snapshot())
+        if path == "/api/settings":
+            return self._json(self.station.settings())
         if path.startswith("/api/hf/"):
             q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             rx = self._hf(q.get("rx", [""])[0])
@@ -126,6 +128,10 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("Add your Anthropic API key under \"ai\" in config.json to use AI explanations")
                 ev["ai"] = st.triage.explain(ev)
                 return self._json({"ok": True, "text": ev["ai"]})
+            elif self.path == "/api/settings":
+                return self._json({"ok": True, "message": st.apply_settings(data)})
+            elif self.path == "/api/test_cat":
+                return self._json({"ok": True, **st.test_cat(data.get("radio") or {}, bool(data.get("hf")))})
             elif self.path == "/api/ack":
                 st.alerts.ack(data.get("key") or None, data.get("who") or "operator")
             elif self.path == "/api/snapshot":
