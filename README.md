@@ -27,6 +27,23 @@ python ocw.py                 # first run creates config.json; edit it, then run
 ```
 The dashboard opens at `http://127.0.0.1:8100`. Click **Arm alarm sound** once; browsers only allow sound after a click.
 
+## Settings (⚙ button, top right)
+Any coast station can set itself up here without editing files.
+- **Station identity:** name, call sign, and either a **grid square** or latitude/longitude (each fills in the other). For example, North Post Radio, Trinidad: call sign `9YL`, grid `FK90`.
+- **AIS receivers and HF receiver:** choose the radio type, COM port and sound device from the lists this computer can see, then press **Test CAT**.
+- **Internet AIS** (see below).
+
+**Save** writes `config.json` and applies the station details and AIS receivers straight away. HF receiver changes apply after a restart.
+
+## Internet AIS ("IS")
+Shows ships from the worldwide **aisstream.io** network, so the chart works when the radio is off or out of range.
+1. Go to aisstream.io, sign in with GitHub, open **API Keys** and create a free key.
+2. In ⚙ Settings → Internet AIS, choose **On** and paste the key.
+3. Set the range around the station (default 100 nm).
+4. Choose **Always** (radio and internet together) or **Only when the radio hears nothing for 5 minutes**.
+
+Ships are marked **RF** (heard by your radio), **IS** (internet only) or **RF+IS**. Internet AIS-SART, MOB and EPIRB reports still raise alerts, and each one says it came from the internet. Internet data is never forwarded to VesselTracker or other sharing networks. The service gives no uptime guarantee, so the radio remains the station's primary source.
+
 ## Console view and faceplates
 **▣ Console** puts the whole station on one screen for a large monitor (it opens automatically on screens 1600 px wide or more):
 - the chart with vessels, aircraft and radiosondes
@@ -189,7 +206,7 @@ data/logs/hfdl|acars|inmarsat-YYYYMMDD.log   raw decoded data messages
 ```
 
 ## Tests
-`python tests/test_pipeline.py && python tests/test_station.py && python tests/test_features.py && python tests/test_hf.py`. The HF suite covers SELCAL in noise, HF DSC, noise reduction, auto-notch, voice detection, RS41 frames (both polarities), feed parsing, CAT modes and the full station wiring. The last suite covers DSC decoding (distress, relay, urgency, test calls), collision geometry, geofences, watchlist, anchor drag, AIS gaps, coverage, the composer templates and AI drafting against a stand-in API. The other suites check the AIS decoder against synthesized signals, emergency classification, the grid square and position formats, the complete emergency flow (alarm, incident report, forwarding, recording capture) and snapshots.
+`python tests/test_pipeline.py && python tests/test_station.py && python tests/test_features.py && python tests/test_hf.py && python tests/test_internet.py`. The HF suite covers SELCAL in noise, HF DSC, noise reduction, auto-notch, voice detection, RS41 frames (both polarities), feed parsing, CAT modes and the full station wiring. The last suite covers DSC decoding (distress, relay, urgency, test calls), collision geometry, geofences, watchlist, anchor drag, AIS gaps, coverage, the composer templates and AI drafting against a stand-in API. The other suites check the AIS decoder against synthesized signals, emergency classification, the grid square and position formats, the complete emergency flow (alarm, incident report, forwarding, recording capture) and snapshots.
 
 ## License
 MIT

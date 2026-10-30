@@ -18,7 +18,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install numpy scipy
-      - run: python tests/test_pipeline.py && python tests/test_station.py && python tests/test_features.py && python tests/test_hf.py
+      - run: python tests/test_pipeline.py && python tests/test_station.py && python tests/test_features.py && python tests/test_hf.py && python tests/test_internet.py
 
   build:
     needs: test

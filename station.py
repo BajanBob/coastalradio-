@@ -154,6 +154,8 @@ class Station:
         self.rate: deque = deque(maxlen=2000)
         # HF console, aviation and data feeds
         self.timeline: deque = deque(maxlen=600)
+        self.last_rf = 0.0
+        self.internet = None
         self.hf_receivers: list = []
         self.sonde_receivers: list = []
         self.sondes = sonde.SondeTracker()
@@ -194,6 +196,10 @@ class Station:
                             "grid": maidenhead(st["lat"], st["lon"]) if st.get("lat") is not None and st.get("lon") is not None else ""},
                 "receivers": [{k: r.get(k) for k in self.RX_KEYS if k in r} for r in self.cfg.get("receivers", [])],
                 "hf": {k: hf.get(k) for k in self.HF_KEYS if k in hf},
+                "internet": {"enabled": bool((self.cfg.get("internet_ais") or {}).get("enabled")),
+                             "api_key_set": bool((self.cfg.get("internet_ais") or {}).get("api_key")),
+                             "radius_nm": (self.cfg.get("internet_ais") or {}).get("radius_nm", 100),
+                             "mode": (self.cfg.get("internet_ais") or {}).get("mode", "always")},
                 "ports": list_serial_ports(), "audio_in": list_audio("input"), "audio_out": list_audio("output"),
                 "config_path": str(Path(self.config_path).resolve()) if getattr(self, "config_path", None) else None,
                 "demo": bool(self.cfg.get("_demo"))}
@@ -269,6 +275,20 @@ class Station:
             hfl[0] = {**hfl[0], **hf}
             hf_changed = before != {k: hfl[0].get(k) for k in self.HF_KEYS}
             saved["hf_receivers"] = hfl
+        if new.get("internet") is not None:
+            ia = dict(saved.get("internet_ais") or {})
+            ni = new["internet"]
+            key = str(ni.get("api_key") or "").strip()
+            if key:
+                ia["api_key"] = key
+            radius = float(ni.get("radius_nm") or 100)
+            if not 5 <= radius <= 1000:
+                raise ValueError("Internet AIS range must be 5 to 1000 nm")
+            ia.update(enabled=bool(ni.get("enabled")), radius_nm=radius,
+                      mode="backup" if ni.get("mode") == "backup" else "always")
+            if ia["enabled"] and not ia.get("api_key"):
+                raise ValueError("Internet AIS needs an API key: get a free one at aisstream.io")
+            saved["internet_ais"] = ia
         tmp = p.with_suffix(".tmp")
         tmp.write_text(json.dumps(saved, indent=2), encoding="utf-8")
         tmp.replace(p)
@@ -294,6 +314,8 @@ class Station:
             if r.get("enabled", True):
                 self.add_audio_receiver(r)
         self.cfg["hf_receivers"] = saved.get("hf_receivers", self.cfg.get("hf_receivers"))
+        self.cfg["internet_ais"] = saved.get("internet_ais", self.cfg.get("internet_ais"))
+        self.start_internet()  # new position or settings: reconnect
         msg = f"Saved to {p.name}. Station {call or name} at {maidenhead(lat, lon)} is live; AIS receivers restarted."
         if hf_changed:
             msg += " Restart the program for the HF receiver changes."
@@ -472,8 +494,9 @@ class Station:
         m = decode(bits)
         if not m:
             return
-        vessel = self.tracker.update(m, source, channel, sentences)
         now = time.time()
+        m["rf_last"] = self.last_rf = now
+        vessel = self.tracker.update(m, source, channel, sentences)
         self.rate.append(now)
         self.chan_heard[channel] = now
         try:
@@ -486,6 +509,32 @@ class Station:
         em = classify(m)
         if em:
             self._emergency(m, vessel, *em)
+
+    # -------------------------------------------------- internet AIS (aisstream.io)
+    def start_internet(self) -> None:
+        from internet_ais import InternetAis
+        if getattr(self, "internet", None):
+            self.internet.stop()
+            self.internet = None
+        c = self.cfg.get("internet_ais") or {}
+        if c.get("enabled") and self.lat is not None and not self.cfg.get("_demo"):
+            self.internet = InternetAis(c, self.lat, self.lon, self.on_internet)
+            print(f"  Internet AIS: {self.internet.status}")
+
+    def on_internet(self, m: dict) -> None:
+        now = time.time()
+        if self.internet and self.internet.mode == "backup" and now - self.last_rf < 300:
+            return  # the radio is hearing ships: use only those
+        m["is_last"] = now
+        vessel = self.tracker.update(m, "Internet (aisstream.io)", "IS")
+        try:
+            self.watch.on_vessel(vessel)
+        except Exception as e:  # noqa: BLE001
+            print(f"[watch] {e}")
+        em = classify(m)
+        if em:
+            level, kind, detail = em
+            self._emergency(m, vessel, level, kind, detail + " · reported via internet AIS, not heard by the station radio")
 
     def _emergency(self, m: dict, vessel: dict, level: str, kind: str, detail: str) -> None:
         mmsi = m["mmsi"]
@@ -578,6 +627,9 @@ class Station:
                               for k, d in self.feed_log.items()},
                       "ai": self.triage.on},
             "timeline": list(self.timeline)[:200],
+            "internet": self.internet.info() if self.internet else
+                        {"enabled": bool((self.cfg.get("internet_ais") or {}).get("enabled")),
+                         "status": "off" if not (self.cfg.get("internet_ais") or {}).get("enabled") else "not started"},
         }
 
 

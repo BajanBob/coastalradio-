@@ -112,7 +112,7 @@ def selftest() -> int:
         assert len(y) > 10000
 
     def modules():
-        import bands, cat, composer, feeds, hf, incidents, notify, recorder, server, station, watch, demo_hf  # noqa: F401,E401
+        import bands, cat, composer, feeds, hf, incidents, internet_ais, notify, recorder, server, station, watch, demo_hf  # noqa: F401,E401
         return f"{len(bands.channels())} HF channels"
 
     def web():
@@ -227,6 +227,7 @@ def main() -> int:
         st.add_dsc_receivers()
         st.add_recorders()
         st.add_hf()
+        st.start_internet()
         if st.notifier.channels():
             print(f"  Alert forwarding: {', '.join(st.notifier.channels())}")
 

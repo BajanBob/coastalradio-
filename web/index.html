@@ -198,6 +198,18 @@ select{background:var(--field);border:1px solid var(--line);color:var(--ink);bor
     For example, North Post Radio, Trinidad: call sign <b>9YL</b>, grid <b>FK90</b>. The name and call sign are used on the console, in reports,
     broadcasts and alert messages; ranges and bearings are measured from this position.</p>
   <h3>AIS receivers</h3><div id="sRx"></div><button id="sAddRx">+ Add AIS receiver</button>
+  <h3>Internet AIS (IS)</h3>
+  <div class="grid">
+    <label>Internet AIS<select id="iOn"><option value="false">Off</option><option value="true">On</option></select></label>
+    <label>aisstream.io API key<input id="iKey" type="password" autocomplete="off" placeholder="paste your free key"></label>
+    <label>Range around the station (nm)<input id="iRad" inputmode="decimal" value="100"></label>
+    <label>Use<select id="iMode"><option value="always">Always, together with the radio (RF + IS)</option>
+      <option value="backup">Only when the radio hears nothing for 5 min</option></select></label>
+  </div>
+  <p class="small">Shows ships from the worldwide aisstream.io network when the radio is off or out of range. Free key: go to
+    <b>aisstream.io</b>, sign in with GitHub, open <b>API Keys</b> and create one. Ships from the internet are marked <span class="chip">IS</span>,
+    ships your radio hears <span class="chip">RF</span>. Internet data is never sent on to VesselTracker or other sharing networks.
+    <span id="iKeyNote"></span></p>
   <h3>HF receiver</h3><div id="sHf"></div>
   <p class="small">COM ports and sound devices are the ones this computer can see right now. If your radio isn't listed, check its USB cable and power,
     then close and reopen Settings. To look around without radios, close the program and double-click <b>Start Demo.bat</b>.</p>
@@ -417,6 +429,9 @@ const api = async (path, body, raw, headers) => {
   const r = await fetch(path, {method: "POST", headers: {"X-OCW": "1", ...(raw ? {} : {"Content-Type": "application/json"}), ...(headers||{})}, body: raw || JSON.stringify(body || {})});
   const j = await r.json().catch(() => ({})); if (!r.ok || j.ok === false) alert(j.error || "Request failed"); poll(); return j; };
 const COLOR = {A:"#33d6ff", B:"#ffb020", "Base station":"#e8eef5", AtoN:"#e05cff", "SAR aircraft":"#7cff6b"};
+const via = v => { const now = Date.now() / 1000, rf = v.rf_last && now - v.rf_last < 900, is = v.is_last && now - v.is_last < 900;
+  return rf && is ? `<span class="chip" title="Heard by the radio and on internet AIS">RF+IS</span>` : rf ? `<span class="chip" title="Heard by the station radio">RF</span>`
+    : is ? `<span class="chip" style="opacity:.75" title="From internet AIS (aisstream.io), not heard by the radio">IS</span>` : ""; };
 const color = v => v.emergency?.level === "crit" ? "#ff3b4e" : COLOR[v.cls] || "#9fb6cb";
 let selected = null, last = null, map = null, layer = null, markers = {}, inited = false, tab = "watch";
 let zoneLayer = null, covLayer = null, riskLayer = null, zoneSig = "", covSig = "", annSel = null;
@@ -559,14 +574,18 @@ function renderWatch(s) {
       <span class="small"> · ${r.channel === "A" ? "AIS 1 (87B)" : "AIS 2 (88B)"} ${r.mhz.toFixed(3)} MHz</span></div>
       <div class="seg">${["A", "B", "SCAN"].map(m => `<button class="${r.mode === m ? "on" : ""}" onclick="api('/api/channel',{rx:${esc(JSON.stringify(r.name))},mode:'${m}'})">${m === "SCAN" ? "Scan" : m}</button>`).join("")}</div></div>
       ${meter(r.level_db)}<div class="small">Audio ${r.level_db} dBFS · ${r.frames} decoded · last ${ago(r.last_frame)} ago · ${esc(r.rig.toUpperCase())}: ${esc(r.rig_status)}</div></div>`; }).join("")
-    + (s.inputs.length ? `<div class="small">Also receiving NMEA from: ${s.inputs.map(esc).join(", ")}</div>` : "");
+    + (s.inputs.length ? `<div class="small">Also receiving NMEA from: ${s.inputs.map(esc).join(", ")}</div>` : "")
+    + (s.internet && s.internet.enabled ? `<div class="rx"><div class="top"><div><span class="led ${s.internet.connected ? "on" : "err"}"></span><b>Internet AIS (IS)</b>
+        <span class="small"> · aisstream.io${s.internet.mode === "backup" ? " · backup when the radio is quiet" : ""}</span></div></div>
+        <div class="small">${esc(s.internet.status)} · ${s.internet.count || 0} messages · last ${ago(s.internet.last)} ago</div></div>`
+      : `<div class="small">Internet AIS (IS) is off. Turn it on in ⚙ Settings to see ships when the radio is off.</div>`);
   $("#outs").textContent = `NMEA out → UDP ${s.outputs.udp.join(", ") || "off"} · TCP ${s.outputs.tcp || "off"}`;
   const q = $("#q").value.trim().toLowerCase();
   const rows = s.vessels.filter(v => !q || `${v.name || ""} ${v.mmsi} ${v.callsign || ""}`.toLowerCase().includes(q));
   $("#list").innerHTML = rows.map(v => `<tr class="click ${v.mmsi === selected ? "sel" : ""} ${v.emergency?.level === "crit" ? "em" : ""}" onclick="select(${v.mmsi})">
-    <td><span class="dotc" style="background:${color(v)}"></span>${esc(v.name || v.mmsi)}</td><td>${esc(v.emergency?.kind || v.shiptype_name || v.aid_type || v.cls || "")}</td>
+    <td><span class="dotc" style="background:${color(v)}"></span>${esc(v.name || v.mmsi)} ${via(v)}</td><td>${esc(v.emergency?.kind || v.shiptype_name || v.aid_type || v.cls || "")}</td>
     <td>${v.sog ?? ""}</td><td>${v.range_nm != null ? v.range_nm + " nm" : ""}</td><td>${ago(v.last)}</td></tr>`).join("") ||
-    `<tr><td colspan="5" class="small">No vessels yet. Check the audio meter moves when the channel is busy.</td></tr>`;
+    `<tr><td colspan="5" class="small">No vessels yet. Check the radio's audio meter moves when the channel is busy, or turn on Internet AIS in ⚙ Settings.</td></tr>`;
   const v = s.vessels.find(x => x.mmsi === selected);
   $("#detail").innerHTML = v ? `<dl class="kv">${[
       ["⚠", v.emergency ? v.emergency.kind : null], ["Name", v.name], ["MMSI", v.mmsi], ["Call sign", v.callsign], ["IMO", v.imo], ["Class", v.cls],
@@ -932,6 +951,9 @@ async function openSettings() {
   $("#sName").value = st.name || ""; $("#sCall").value = st.callsign || ""; $("#sGrid").value = st.grid || "";
   $("#sLat").value = st.lat ?? ""; $("#sLon").value = st.lon ?? "";
   $("#setPath").textContent = setData.demo ? "DEMO: settings can't be saved" : (setData.config_path ? "Saves to " + setData.config_path : "");
+  const ia = setData.internet || {};
+  $("#iOn").value = String(!!ia.enabled); $("#iRad").value = ia.radius_nm ?? 100; $("#iMode").value = ia.mode || "always"; $("#iKey").value = "";
+  $("#iKeyNote").textContent = ia.api_key_set ? "A key is saved; leave the box empty to keep it." : "";
   $("#setMsg").textContent = ""; drawRadios(); $("#setModal").classList.add("on");
 }
 $("#setBtn").onclick = openSettings;
@@ -940,7 +962,8 @@ $("#sAddRx").onclick = () => { syncRadios(); setData.receivers.push({name: "Rece
 $("#setSave").onclick = async () => {
   syncRadios();
   const body = {station: {name: $("#sName").value, callsign: $("#sCall").value, grid: $("#sGrid").value, lat: $("#sLat").value, lon: $("#sLon").value},
-                receivers: setData.receivers, hf: setData.hf};
+                receivers: setData.receivers, hf: setData.hf,
+                internet: {enabled: $("#iOn").value === "true", api_key: $("#iKey").value, radius_nm: $("#iRad").value, mode: $("#iMode").value}};
   $("#setMsg").textContent = "saving…";
   const r = await fetch("/api/settings", {method: "POST", headers: {"X-OCW": "1", "Content-Type": "application/json"}, body: JSON.stringify(body)})
     .then(x => x.json()).catch(e => ({ok: false, error: String(e)}));
@@ -1050,7 +1073,8 @@ function renderConsole(s) {
     ...(s.hf || []).map(h => `<span class="chip"><span class="led ${h.cat_ok ? "on" : "err"}"></span>HF ${esc(h.name)} · ${h.dial_khz} kHz</span>`),
     ...s.recorders.map(r => `<span class="chip"><span class="led ${r.recording ? "rec" : r.error ? "err" : "on"}"></span>REC ${esc(r.name)}</span>`),
     ...((s.sondes || {}).receivers || []).map(r => `<span class="chip">SONDE ${esc(r.name)} · ${r.frames}</span>`),
-    ...((s.feeds || {}).listeners || []).map(l => `<span class="chip">${esc(l.kind.toUpperCase())} · ${l.count}</span>`)].join(" ");
+    ...((s.feeds || {}).listeners || []).map(l => `<span class="chip">${esc(l.kind.toUpperCase())} · ${l.count}</span>`),
+    ...(s.internet && s.internet.enabled ? [`<span class="chip"><span class="led ${s.internet.connected ? "on" : "err"}"></span>INTERNET AIS · ${s.internet.count || 0}</span>`] : [])].join(" ");
   const calls = [...s.dsc.log.map(m => ({t: m.t, level: m.level, txt: `DSC ${m.summary} (${m.source})`})),
     ...(s.hf || []).flatMap(h => h.selcal.map(c => ({t: c.t, level: c.watch ? "warn" : "", txt: `SELCAL ${c.code} · ${c.khz} kHz${c.watch ? " · " + c.watch : ""}`})))]
     .sort((a, b) => b.t - a.t).slice(0, 40);

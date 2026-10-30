@@ -104,6 +104,13 @@
     }
   ],
 
+  "internet_ais": {
+    "enabled": false,
+    "api_key": "",
+    "radius_nm": 100,
+    "mode": "always"
+  },
+
   "feeds": {
     "hfdl": { "enabled": false, "port": 5555, "bind": "0.0.0.0" },
     "acars": { "enabled": false, "port": 5556, "bind": "0.0.0.0" },
