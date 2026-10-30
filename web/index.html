@@ -954,7 +954,11 @@ async function openSettings() {
   $("#setPath").textContent = setData.demo ? "DEMO: settings can't be saved" : (setData.config_path ? "Saves to " + setData.config_path : "");
   const ia = setData.internet || {};
   $("#iOn").value = String(!!ia.enabled); $("#iRad").value = ia.radius_nm ?? 100; $("#iMode").value = ia.mode || "always"; $("#iKey").value = "";
-  $("#iKeyNote").textContent = ia.api_key_set ? "A key is saved; leave the box empty to keep it." : "";
+  $("#iKey").placeholder = ia.api_key_set ? `saved key ••••${ia.api_key_hint} (leave empty to keep it)` : "paste your free key";
+  $("#iKeyNote").innerHTML = ia.api_key_set
+    ? `<br><b style="color:var(--ok)">✓ Key saved (ends …${esc(ia.api_key_hint)}).</b> For safety the box stays empty; you don't need to paste it again.
+       Status: <b style="color:${ia.connected ? "var(--ok)" : "var(--warn)"}">${esc(ia.status)}</b>`
+    : `<br><b style="color:var(--warn)">No key saved yet.</b>`;
   $("#setMsg").textContent = ""; drawRadios(); $("#setModal").classList.add("on");
 }
 $("#setBtn").onclick = openSettings;
@@ -969,7 +973,8 @@ $("#setSave").onclick = async () => {
   $("#setMsg").textContent = "saving…";
   const r = await fetch("/api/settings", {method: "POST", headers: {"X-OCW": "1", "Content-Type": "application/json"}, body: JSON.stringify(body)})
     .then(x => x.json()).catch(e => ({ok: false, error: String(e)}));
-  $("#setMsg").textContent = r.ok ? "✓ " + r.message : "✗ " + (r.error || "failed");
+  $("#setMsg").innerHTML = r.ok ? `<b style="color:var(--ok)">✓ ${esc(r.message)}</b>` : `<b style="color:var(--bad)">✗ ${esc(r.error || "failed")}</b>`;
+  if (!r.ok) alert("Settings were NOT saved:\n\n" + (r.error || "failed"));
   if (r.ok) setTimeout(() => location.reload(), 2500);  // redraw the chart around the new position
 };
 

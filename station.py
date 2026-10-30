@@ -198,6 +198,9 @@ class Station:
                 "hf": {k: hf.get(k) for k in self.HF_KEYS if k in hf},
                 "internet": {"enabled": bool((self.cfg.get("internet_ais") or {}).get("enabled")),
                              "api_key_set": bool((self.cfg.get("internet_ais") or {}).get("api_key")),
+                             "api_key_hint": str((self.cfg.get("internet_ais") or {}).get("api_key") or "")[-4:],
+                             "status": self.internet.status if self.internet else "off",
+                             "connected": bool(self.internet and self.internet.connected),
                              "radius_nm": (self.cfg.get("internet_ais") or {}).get("radius_nm", 100),
                              "mode": (self.cfg.get("internet_ais") or {}).get("mode", "always")},
                 "ports": list_serial_ports(), "audio_in": list_audio("input"), "audio_out": list_audio("output"),
@@ -271,6 +274,8 @@ class Station:
         hf_changed = False
         if hf:
             hfl = saved.get("hf_receivers") or [{}]
+            if not hf.get("model"):
+                hf["model"] = hfl[0].get("model", "")  # the page doesn't show the model for non-Icom radios
             before = {k: hfl[0].get(k) for k in self.HF_KEYS}
             hfl[0] = {**hfl[0], **hf}
             hf_changed = before != {k: hfl[0].get(k) for k in self.HF_KEYS}
